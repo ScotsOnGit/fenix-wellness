@@ -8,6 +8,8 @@ xcuserdata/
 ios/fenix/SupabaseConfig.plist
 android/local.properties
 android/app/src/**/supabase.properties
+android/.gradle/
+android/app/build/
 .env
 .env.*
 

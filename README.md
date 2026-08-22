@@ -9,7 +9,7 @@ This repository is private and intentionally contains **no live Supabase credent
 | Area | Location | Status |
 | --- | --- | --- |
 | iOS | [`ios/`](ios) | Native SwiftUI implementation included |
-| Android | [`android/`](android) | Reserved; native Kotlin/Compose port to be built |
+| Android | [`android/`](android) | Native Kotlin/Compose auth and booking foundation included |
 | Database | [`supabase/`](supabase) | Feature migrations included; baseline schema recovery required |
 | Original product brief | [`docs/source-brief/`](docs/source-brief) | Reference material |
 
@@ -75,7 +75,7 @@ Requirements: a current macOS/Xcode installation, an Apple Developer team, and a
 
 ### 4. Implement and configure Android
 
-See [`android/README.md`](android/README.md). The Android app must be built as a separate native Kotlin/Compose client and consume the same backend contract. Before feature work begins, reproduce the repository interface and models used by iOS, then implement Auth/deep links, booking availability and RPCs, storage resources, QR scanning, local unlock, notifications, and the admin experience.
+See [`android/README.md`](android/README.md). The Android app is a separate native Kotlin/Compose client and consumes the same backend contract. Auth, password-reset deep linking, session persistence, booking availability, and booking confirmation are implemented. Remaining work is resources, challenges, QR check-in, local biometric/PIN unlock, notifications, and the administration experience.
 
 Use an Android-specific deep-link callback and add an intent filter that precisely matches it. Test cold-start and warm-start password-reset callbacks on a physical device.
 
