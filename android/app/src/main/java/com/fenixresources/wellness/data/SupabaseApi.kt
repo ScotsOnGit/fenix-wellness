@@ -78,7 +78,7 @@ class SupabaseApi(context: Context, private val session: SessionStore) {
         }
     }
 
-    suspend fun fetchRules(): FacilityRules = request("/rest/v1/facility_rules?select=allowed_durations_minutes,booking_horizon_days&id=eq.true") {
+    suspend fun fetchRules(): FacilityRules = request<List<FacilityRules>>("/rest/v1/facility_rules?select=allowed_durations_minutes,booking_horizon_days&id=eq.true") {
         method = io.ktor.http.HttpMethod.Get
     }.first()
 
@@ -115,7 +115,7 @@ class SupabaseApi(context: Context, private val session: SessionStore) {
         val response = client.request("$baseUrl$path") {
             header("apikey", key)
             accept(ContentType.Application.Json)
-            contentType(ContentType.Application.Json)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             if (authenticated) session.accessToken?.let { header(HttpHeaders.Authorization, "Bearer $it") }
             block()
         }
