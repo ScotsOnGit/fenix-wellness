@@ -1,0 +1,17 @@
+# macOS and Xcode
+.DS_Store
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Per-environment mobile configuration
+ios/fenix/SupabaseConfig.plist
+android/local.properties
+android/app/src/**/supabase.properties
+.env
+.env.*
+
+# Supabase CLI local state and secrets
+supabase/.temp/
+supabase/.branches/
+supabase/.env
