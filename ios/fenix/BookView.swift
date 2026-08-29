@@ -411,6 +411,14 @@ struct BookingConfirmationView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppModel.self) private var appModel
 
+    private var cancellationCutoffMinutes: Int {
+        appModel.rules?.cancellationCutoffMinutes ?? FacilityRules.fenixDefault.cancellationCutoffMinutes
+    }
+
+    private var reminderMinutes: Int {
+        60
+    }
+
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
@@ -429,11 +437,11 @@ struct BookingConfirmationView: View {
                     )
                     ConfirmationRuleRow(
                         systemImage: "clock.badge.checkmark",
-                        text: "Bookings can be cancelled until 60 minutes before the session starts."
+                        text: "Bookings can be cancelled until \(cancellationCutoffMinutes) minutes before the session starts."
                     )
                     ConfirmationRuleRow(
                         systemImage: "bell",
-                        text: "A reminder will be scheduled 60 minutes before your session if notifications are allowed."
+                        text: "A reminder will be scheduled \(reminderMinutes) minutes before your session if notifications are allowed."
                     )
                 }
                 .padding()

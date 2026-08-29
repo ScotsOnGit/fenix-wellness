@@ -38,10 +38,10 @@ struct fenixTests {
         let calendar = FacilityTime.calendar
         let targetDay = calendar.date(byAdding: .day, value: 2, to: calendar.startOfDay(for: Date())) ?? Date()
 
-        let slots = try await repository.fetchAvailability(for: targetDay, durationMinutes: 60)
+        let slots = try await repository.fetchAvailability(for: targetDay, durationMinutes: 45)
 
         #expect(FacilityTime.timeText(slots.first?.startTime ?? Date()) == "7:00 AM")
-        #expect(FacilityTime.timeText(slots.last?.startTime ?? Date()) == "6:00 PM")
+        #expect(FacilityTime.timeText(slots.last?.startTime ?? Date()) == "6:15 PM")
         #expect(slots.allSatisfy { slot in
             let hour = calendar.component(.hour, from: slot.startTime)
             let minute = calendar.component(.minute, from: slot.startTime)
@@ -57,17 +57,17 @@ struct fenixTests {
         let calendar = FacilityTime.calendar
         let targetDay = calendar.date(byAdding: .day, value: 3, to: calendar.startOfDay(for: Date())) ?? Date()
         let beforeOpen = calendar.date(bySettingHour: 6, minute: 45, second: 0, of: targetDay) ?? targetDay
-        let tooLate = calendar.date(bySettingHour: 18, minute: 15, second: 0, of: targetDay) ?? targetDay
+        let tooLate = calendar.date(bySettingHour: 18, minute: 30, second: 0, of: targetDay) ?? targetDay
         let lastValid = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: targetDay) ?? targetDay
 
         await #expect(throws: BookingError.outsideOpeningHours) {
             _ = try await repository.createBooking(startTime: beforeOpen, durationMinutes: 15)
         }
         await #expect(throws: BookingError.outsideOpeningHours) {
-            _ = try await repository.createBooking(startTime: tooLate, durationMinutes: 60)
+            _ = try await repository.createBooking(startTime: tooLate, durationMinutes: 45)
         }
 
-        _ = try await repository.createBooking(startTime: lastValid, durationMinutes: 60)
+        _ = try await repository.createBooking(startTime: lastValid, durationMinutes: 45)
     }
 
 }

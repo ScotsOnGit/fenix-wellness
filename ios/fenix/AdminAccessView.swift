@@ -29,13 +29,17 @@ struct AdminAccessView: View {
                 Button {
                     let targetEmail = email
                     Task {
-                        await appModel.promoteAdmin(email: targetEmail)
-                        if appModel.loadState == .idle {
+                        let didPromote = await appModel.promoteAdmin(email: targetEmail)
+                        if didPromote {
                             email = ""
                         }
                     }
                 } label: {
-                    Label("Add admin", systemImage: "person.badge.plus")
+                    if appModel.loadState == .loading {
+                        Label("Adding admin", systemImage: "hourglass")
+                    } else {
+                        Label("Add admin", systemImage: "person.badge.plus")
+                    }
                 }
                 .disabled(!canPromote)
             } header: {
@@ -44,6 +48,15 @@ struct AdminAccessView: View {
                 Text("The staff member must already have a registered account. Admin access should only be given to trusted users who manage bookings and wellness centre settings.")
             }
             .listRowBackground(FenixTheme.darkCard)
+
+            if let accountMessage = appModel.accountMessage(for: .access) {
+                Section {
+                    Label(accountMessage, systemImage: "info.circle")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(FenixTheme.darkSecondaryText)
+                }
+                .listRowBackground(FenixTheme.darkCard)
+            }
 
             Section("Current Admins") {
                 if appModel.adminProfiles.isEmpty {
@@ -69,14 +82,6 @@ struct AdminAccessView: View {
                     .foregroundStyle(FenixTheme.darkSecondaryText)
             }
             .listRowBackground(FenixTheme.darkCard)
-
-            if let accountMessage = appModel.accountMessage(for: .access) {
-                Section {
-                    Text(accountMessage)
-                        .foregroundStyle(FenixTheme.darkSecondaryText)
-                }
-                .listRowBackground(FenixTheme.darkCard)
-            }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)

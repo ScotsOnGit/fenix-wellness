@@ -247,16 +247,24 @@ struct WellnessAcknowledgementView: View {
             WellnessAcknowledgementContent()
 
             Button {
-                appModel.acceptWellnessAcknowledgement()
+                Task { await appModel.acceptWellnessAcknowledgement() }
             } label: {
                 Text("I acknowledge")
                     .fontWeight(.bold)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(FenixTheme.orange, in: Capsule())
+                    .background(appModel.loadState == .loading ? FenixTheme.orange.opacity(0.35) : FenixTheme.orange, in: Capsule())
                     .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
+            .disabled(appModel.loadState == .loading)
+
+            if let message = appModel.accountMessage(for: .acknowledgement) {
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(FenixTheme.amber)
+                    .multilineTextAlignment(.center)
+            }
 
             Button(role: .destructive) {
                 Task { await appModel.signOut() }
@@ -276,16 +284,18 @@ struct WellnessAcknowledgementView: View {
 
 struct WellnessAcknowledgementContent: View {
     @Environment(AppModel.self) private var appModel
+    var acknowledgementOverride: WellnessAcknowledgement? = nil
 
     var body: some View {
         let rules = appModel.rules ?? .fenixDefault
+        let acknowledgement = acknowledgementOverride ?? appModel.activeAcknowledgement
         VStack(spacing: 14) {
-            Text("Wellness Centre Acknowledgement")
+            Text(acknowledgement.title)
                 .font(.title2.weight(.bold))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white)
 
-            Text("Please read and acknowledge this before using the wellness centre. Use of the facility is voluntary and at your own risk. If you have a medical condition, injury, or any concern about exercise, seek medical advice before using the facility.")
+            Text(acknowledgement.body)
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(FenixTheme.darkSecondaryText)
@@ -293,14 +303,19 @@ struct WellnessAcknowledgementContent: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 AcknowledgementPoint(
+                    icon: "heart.text.square",
+                    title: "Medical advice",
+                    text: acknowledgement.medicalText
+                )
+                AcknowledgementPoint(
                     icon: "person.3.fill",
                     title: "Capacity",
-                    text: "The wellness centre is limited to \(rules.capacity) people at a time."
+                    text: acknowledgement.capacityText.isEmpty ? "The wellness centre is limited to \(rules.capacity) people at a time." : acknowledgement.capacityText
                 )
                 AcknowledgementPoint(
                     icon: "calendar.badge.clock",
                     title: "Fair use",
-                    text: "To keep access fair, each staff member can book one session per day, up to \(rules.bookingHorizonDays) days in advance."
+                    text: acknowledgement.fairUseText.isEmpty ? "To keep access fair, each staff member can book one session per day, up to \(rules.bookingHorizonDays) days in advance." : acknowledgement.fairUseText
                 )
                 AcknowledgementPoint(
                     icon: "clock",
@@ -316,7 +331,7 @@ struct WellnessAcknowledgementContent: View {
             .padding()
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
 
-            Text("Acknowledgement version \(AppModel.wellnessAcknowledgementVersion)")
+            Text("Acknowledgement version \(acknowledgement.version)")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(FenixTheme.darkSecondaryText)
         }

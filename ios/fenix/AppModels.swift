@@ -36,6 +36,18 @@ enum FenixBrand {
     static let passwordResetRedirectURL = URL(string: "fenixwellness://password-reset")!
 }
 
+enum FenixURLValidator {
+    static func webURL(from text: String) -> URL? {
+        guard let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.host?.isEmpty == false else {
+            return nil
+        }
+        return url
+    }
+}
+
 struct FenixBrandMark: View {
     var size: CGFloat = 66
     var padding: CGFloat = 13
@@ -211,6 +223,40 @@ struct FacilityContact: Equatable, Sendable {
         email: "",
         notes: "Contact your Fenix admin or HR team for wellness centre support."
     )
+}
+
+struct WellnessAcknowledgement: Identifiable, Equatable, Sendable {
+    var id: UUID
+    var version: String
+    var title: String
+    var body: String
+    var capacityText: String
+    var fairUseText: String
+    var medicalText: String
+    var isActive: Bool
+    var publishedAt: Date?
+    var createdAt: Date
+    var updatedAt: Date
+
+    static let fallback = WellnessAcknowledgement(
+        id: UUID(uuidString: "FEE00000-0000-4000-8000-000000000100")!,
+        version: "2026-06-06-v1",
+        title: "Wellness Centre Acknowledgement",
+        body: "Please read and acknowledge this before using the wellness centre. Use of the facility is voluntary and at your own risk.",
+        capacityText: "The wellness centre is limited to 20 people at a time.",
+        fairUseText: "To keep access fair, each staff member can book one session per day, up to 7 days in advance.",
+        medicalText: "If you have a medical condition, injury, or any concern about exercise, seek medical advice before using the facility.",
+        isActive: true,
+        publishedAt: nil,
+        createdAt: Date(timeIntervalSince1970: 1_717_676_800),
+        updatedAt: Date(timeIntervalSince1970: 1_717_676_800)
+    )
+}
+
+struct WellnessAcknowledgementAcceptance: Equatable, Sendable {
+    var acknowledgementID: UUID
+    var version: String
+    var acceptedAt: Date
 }
 
 struct UserProfile: Identifiable, Equatable, Sendable {
@@ -465,7 +511,7 @@ struct WellnessResource: Identifiable, Equatable, Sendable {
     var createdAt: Date
 
     var displayURL: URL? {
-        URL(string: url)
+        FenixURLValidator.webURL(from: url)
     }
 }
 
@@ -482,7 +528,7 @@ struct ProgramAssignment: Identifiable, Equatable, Sendable {
     var archivedAt: Date?
 
     var displayURL: URL? {
-        URL(string: url)
+        FenixURLValidator.webURL(from: url)
     }
 }
 

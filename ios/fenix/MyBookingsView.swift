@@ -31,10 +31,12 @@ struct MyBookingsView: View {
                     }
                         .listRowBackground(FenixTheme.darkCard)
                         .swipeActions {
-                            Button(role: .destructive) {
-                                bookingToCancel = nextBooking
-                            } label: {
-                                Label("Cancel", systemImage: "xmark.circle")
+                            if canCancel(nextBooking) {
+                                Button(role: .destructive) {
+                                    bookingToCancel = nextBooking
+                                } label: {
+                                    Label("Cancel", systemImage: "xmark.circle")
+                                }
                             }
                         }
                 } else {
@@ -61,10 +63,12 @@ struct MyBookingsView: View {
                         }
                             .listRowBackground(FenixTheme.darkCard)
                             .swipeActions {
-                                Button(role: .destructive) {
-                                    bookingToCancel = booking
-                                } label: {
-                                    Label("Cancel", systemImage: "xmark.circle")
+                                if canCancel(booking) {
+                                    Button(role: .destructive) {
+                                        bookingToCancel = booking
+                                    } label: {
+                                        Label("Cancel", systemImage: "xmark.circle")
+                                    }
                                 }
                             }
                 }

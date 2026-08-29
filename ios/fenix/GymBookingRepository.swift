@@ -22,6 +22,10 @@ protocol GymBookingRepository {
     func updateOpeningHours(_ openingHours: [OpeningHours]) async throws -> [OpeningHours]
     func fetchFacilityContact() async throws -> FacilityContact
     func updateFacilityContact(_ contact: FacilityContact) async throws -> FacilityContact
+    func fetchActiveAcknowledgement() async throws -> WellnessAcknowledgement
+    func fetchMyAcknowledgementAcceptance() async throws -> WellnessAcknowledgementAcceptance?
+    func acceptAcknowledgement(_ acknowledgement: WellnessAcknowledgement) async throws -> WellnessAcknowledgementAcceptance
+    func publishAcknowledgement(title: String, body: String, capacityText: String, fairUseText: String, medicalText: String) async throws -> WellnessAcknowledgement
     func fetchBlackoutPeriods() async throws -> [BlackoutPeriod]
     func createBlackoutPeriod(startsAt: Date, endsAt: Date, reason: String) async throws -> BlackoutPeriod
     func deleteBlackoutPeriod(_ blackout: BlackoutPeriod) async throws
@@ -30,6 +34,7 @@ protocol GymBookingRepository {
     func demoteAdmin(_ admin: UserProfile) async throws
     func searchMembers(query: String) async throws -> [UserProfile]
     func updateMemberAccess(_ member: UserProfile, accessStatus: UserProfile.AccessStatus, inductionComplete: Bool) async throws -> UserProfile
+    func deleteRemovedMemberLogin(_ member: UserProfile) async throws
     func fetchAvailability(for date: Date, durationMinutes: Int) async throws -> [AvailabilitySlot]
     func createBooking(startTime: Date, durationMinutes: Int) async throws -> GymBooking
     func fetchBookings() async throws -> [GymBooking]
@@ -70,6 +75,8 @@ final class MockGymBookingRepository: GymBookingRepository {
     private var rules = FacilityRules.fenixDefault
     private var openingHours = OpeningHours.fenixDefaultWeek
     private var facilityContact = FacilityContact.fenixDefault
+    private var activeAcknowledgement = WellnessAcknowledgement.fallback
+    private var acknowledgementAcceptances: [UUID: WellnessAcknowledgementAcceptance] = [:]
     private var blackoutPeriods: [BlackoutPeriod] = []
     private var profiles: [UserProfile] = []
     private var resources: [WellnessResource] = []
@@ -237,6 +244,47 @@ final class MockGymBookingRepository: GymBookingRepository {
         return contact
     }
 
+    func fetchActiveAcknowledgement() async throws -> WellnessAcknowledgement {
+        try await shortDelay()
+        return activeAcknowledgement
+    }
+
+    func fetchMyAcknowledgementAcceptance() async throws -> WellnessAcknowledgementAcceptance? {
+        try await shortDelay()
+        guard let userID = signedInProfile?.id else { return nil }
+        return acknowledgementAcceptances[userID]
+    }
+
+    func acceptAcknowledgement(_ acknowledgement: WellnessAcknowledgement) async throws -> WellnessAcknowledgementAcceptance {
+        try await shortDelay()
+        guard let userID = signedInProfile?.id else { throw BookingError.unauthenticated }
+        let acceptance = WellnessAcknowledgementAcceptance(
+            acknowledgementID: acknowledgement.id,
+            version: acknowledgement.version,
+            acceptedAt: Date()
+        )
+        acknowledgementAcceptances[userID] = acceptance
+        return acceptance
+    }
+
+    func publishAcknowledgement(title: String, body: String, capacityText: String, fairUseText: String, medicalText: String) async throws -> WellnessAcknowledgement {
+        try await shortDelay()
+        activeAcknowledgement = WellnessAcknowledgement(
+            id: UUID(),
+            version: "v\(Int(Date().timeIntervalSince1970))",
+            title: title,
+            body: body,
+            capacityText: capacityText,
+            fairUseText: fairUseText,
+            medicalText: medicalText,
+            isActive: true,
+            publishedAt: Date(),
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        return activeAcknowledgement
+    }
+
     func fetchBlackoutPeriods() async throws -> [BlackoutPeriod] {
         try await shortDelay()
         return blackoutPeriods.sorted { $0.startsAt < $1.startsAt }
@@ -307,11 +355,40 @@ final class MockGymBookingRepository: GymBookingRepository {
         }
         profiles[index].accessStatus = accessStatus
         profiles[index].inductionCompletedAt = inductionComplete ? (profiles[index].inductionCompletedAt ?? Date()) : nil
+        if accessStatus == .removed {
+            profiles[index].inductionCompletedAt = nil
+            let now = Date()
+            for bookingIndex in bookings.indices where bookings[bookingIndex].userID == member.id && bookings[bookingIndex].cancelledAt == nil && bookings[bookingIndex].startTime > now {
+                bookings[bookingIndex].cancelledAt = now
+            }
+            for programIndex in programs.indices where programs[programIndex].userID == member.id && programs[programIndex].archivedAt == nil {
+                programs[programIndex].archivedAt = now
+            }
+        }
         if signedInProfile?.id == member.id {
             signedInProfile = profiles[index]
         }
-        audit(action: "profile_access_changed", targetType: "profile", targetID: member.id.uuidString)
+        audit(action: accessStatus == .removed ? "member_access_removed" : "profile_access_changed", targetType: "profile", targetID: member.id.uuidString)
         return profiles[index]
+    }
+
+    func deleteRemovedMemberLogin(_ member: UserProfile) async throws {
+        try await shortDelay()
+        guard member.accessStatus == .removed else {
+            throw BookingError.remote("Remove this member's access before deleting their login account.")
+        }
+        guard member.role == .member else {
+            throw BookingError.remote("Admin accounts cannot be deleted from this screen.")
+        }
+        profiles.removeAll { $0.id == member.id }
+        let now = Date()
+        for bookingIndex in bookings.indices where bookings[bookingIndex].userID == member.id && bookings[bookingIndex].cancelledAt == nil && bookings[bookingIndex].startTime > now {
+            bookings[bookingIndex].cancelledAt = now
+        }
+        for programIndex in programs.indices where programs[programIndex].userID == member.id && programs[programIndex].archivedAt == nil {
+            programs[programIndex].archivedAt = now
+        }
+        audit(action: "member_auth_deleted", targetType: "profile", targetID: member.id.uuidString)
     }
 
     func fetchAvailability(for date: Date, durationMinutes: Int) async throws -> [AvailabilitySlot] {

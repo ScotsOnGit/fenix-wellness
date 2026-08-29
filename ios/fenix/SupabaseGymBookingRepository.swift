@@ -110,6 +110,46 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
         }
     }
 
+    private struct AcknowledgementRow: Decodable {
+        let id: UUID
+        let version: String
+        let title: String
+        let body: String
+        let capacityText: String?
+        let fairUseText: String?
+        let medicalText: String?
+        let isActive: Bool
+        let publishedAt: Date?
+        let createdAt: Date
+        let updatedAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case version
+            case title
+            case body
+            case capacityText = "capacity_text"
+            case fairUseText = "fair_use_text"
+            case medicalText = "medical_text"
+            case isActive = "is_active"
+            case publishedAt = "published_at"
+            case createdAt = "created_at"
+            case updatedAt = "updated_at"
+        }
+    }
+
+    private struct AcknowledgementAcceptanceRow: Decodable {
+        let acknowledgementID: UUID
+        let version: String
+        let acceptedAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case acknowledgementID = "acknowledgement_id"
+            case version
+            case acceptedAt = "accepted_at"
+        }
+    }
+
     private struct BlackoutPeriodRow: Codable {
         let id: UUID
         let startsAt: Date
@@ -584,6 +624,83 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
         return try await fetchFacilityContact()
     }
 
+    func fetchActiveAcknowledgement() async throws -> WellnessAcknowledgement {
+        let rows: [AcknowledgementRow] = try await request(
+            path: "/rest/v1/wellness_acknowledgements",
+            queryItems: [
+                URLQueryItem(name: "select", value: "*"),
+                URLQueryItem(name: "is_active", value: "eq.true"),
+                URLQueryItem(name: "limit", value: "1")
+            ],
+            method: "GET",
+            requiresAuth: false
+        )
+        return rows.first.map(acknowledgement(from:)) ?? .fallback
+    }
+
+    func fetchMyAcknowledgementAcceptance() async throws -> WellnessAcknowledgementAcceptance? {
+        guard let userID = authSession?.userID else { return nil }
+        let rows: [AcknowledgementAcceptanceRow] = try await request(
+            path: "/rest/v1/profile_acknowledgements",
+            queryItems: [
+                URLQueryItem(name: "select", value: "acknowledgement_id,version,accepted_at"),
+                URLQueryItem(name: "profile_id", value: "eq.\(userID.uuidString)"),
+                URLQueryItem(name: "order", value: "accepted_at.desc"),
+                URLQueryItem(name: "limit", value: "10")
+            ],
+            method: "GET"
+        )
+        return rows.first.map(acknowledgementAcceptance(from:))
+    }
+
+    func acceptAcknowledgement(_ acknowledgement: WellnessAcknowledgement) async throws -> WellnessAcknowledgementAcceptance {
+        guard let userID = authSession?.userID else { throw BookingError.unauthenticated }
+        let existingRows: [AcknowledgementAcceptanceRow] = try await request(
+            path: "/rest/v1/profile_acknowledgements",
+            queryItems: [
+                URLQueryItem(name: "select", value: "acknowledgement_id,version,accepted_at"),
+                URLQueryItem(name: "profile_id", value: "eq.\(userID.uuidString)"),
+                URLQueryItem(name: "acknowledgement_id", value: "eq.\(acknowledgement.id.uuidString)"),
+                URLQueryItem(name: "limit", value: "1")
+            ],
+            method: "GET"
+        )
+        if let existing = existingRows.first {
+            return acknowledgementAcceptance(from: existing)
+        }
+
+        try await requestWithoutResponse(
+            path: "/rest/v1/profile_acknowledgements",
+            method: "POST",
+            body: [
+                "profile_id": SendableValue.string(userID.uuidString),
+                "acknowledgement_id": SendableValue.string(acknowledgement.id.uuidString),
+                "version": SendableValue.string(acknowledgement.version)
+            ]
+        )
+        let acceptedAt = Date()
+        return WellnessAcknowledgementAcceptance(
+            acknowledgementID: acknowledgement.id,
+            version: acknowledgement.version,
+            acceptedAt: acceptedAt
+        )
+    }
+
+    func publishAcknowledgement(title: String, body: String, capacityText: String, fairUseText: String, medicalText: String) async throws -> WellnessAcknowledgement {
+        let row: AcknowledgementRow = try await request(
+            path: "/rest/v1/rpc/publish_wellness_acknowledgement",
+            method: "POST",
+            body: [
+                "p_title": SendableValue.string(title),
+                "p_body": SendableValue.string(body),
+                "p_capacity_text": nullableString(capacityText),
+                "p_fair_use_text": SendableValue.string(fairUseText),
+                "p_medical_text": SendableValue.string(medicalText)
+            ]
+        )
+        return acknowledgement(from: row)
+    }
+
     func fetchBlackoutPeriods() async throws -> [BlackoutPeriod] {
         let rows: [BlackoutPeriodRow] = try await request(
             path: "/rest/v1/blackout_periods",
@@ -646,14 +763,7 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
             throw BookingError.remote("Enter the staff member's email address.")
         }
 
-        try await requestWithoutResponse(
-            path: "/rest/v1/profiles",
-            queryItems: [URLQueryItem(name: "email", value: "eq.\(cleanEmail)")],
-            method: "PATCH",
-            body: ["role": SendableValue.string(UserProfile.Role.admin.rawValue)]
-        )
-
-        let rows: [ProfileRow] = try await request(
+        let existingRows: [ProfileRow] = try await request(
             path: "/rest/v1/profiles",
             queryItems: [
                 URLQueryItem(name: "select", value: "*"),
@@ -662,10 +772,35 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
             ],
             method: "GET"
         )
-        guard let row = rows.first, row.role == UserProfile.Role.admin.rawValue else {
+        guard let existingRow = existingRows.first else {
             throw BookingError.remote("No registered staff account found for \(cleanEmail). Ask them to create their account first, then try again.")
         }
-        return profile(from: row)
+        if existingRow.role == UserProfile.Role.admin.rawValue {
+            return profile(from: existingRow)
+        }
+
+        try await requestWithoutResponse(
+            path: "/rest/v1/profiles",
+            queryItems: [
+                URLQueryItem(name: "email", value: "eq.\(cleanEmail)")
+            ],
+            method: "PATCH",
+            body: ["role": SendableValue.string(UserProfile.Role.admin.rawValue)]
+        )
+
+        let updatedRows: [ProfileRow] = try await request(
+            path: "/rest/v1/profiles",
+            queryItems: [
+                URLQueryItem(name: "select", value: "*"),
+                URLQueryItem(name: "email", value: "eq.\(cleanEmail)"),
+                URLQueryItem(name: "limit", value: "1")
+            ],
+            method: "GET"
+        )
+        guard let updatedRow = updatedRows.first, updatedRow.role == UserProfile.Role.admin.rawValue else {
+            throw BookingError.remote("Could not add admin access for \(cleanEmail). Check your admin permissions and try again.")
+        }
+        return profile(from: updatedRow)
     }
 
     func demoteAdmin(_ admin: UserProfile) async throws {
@@ -713,6 +848,16 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
             ]
         )
         return profile(from: row)
+    }
+
+    func deleteRemovedMemberLogin(_ member: UserProfile) async throws {
+        let _: EmptyResponse = try await request(
+            path: "/functions/v1/delete-removed-member",
+            method: "POST",
+            body: [
+                "user_id": SendableValue.string(member.id.uuidString)
+            ]
+        )
     }
 
     func signOut() async throws {
@@ -1269,6 +1414,30 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
             phone: row.phone ?? "",
             email: row.email ?? "",
             notes: row.notes ?? ""
+        )
+    }
+
+    private func acknowledgement(from row: AcknowledgementRow) -> WellnessAcknowledgement {
+        WellnessAcknowledgement(
+            id: row.id,
+            version: row.version,
+            title: row.title,
+            body: row.body,
+            capacityText: row.capacityText ?? "",
+            fairUseText: row.fairUseText ?? "",
+            medicalText: row.medicalText ?? "",
+            isActive: row.isActive,
+            publishedAt: row.publishedAt,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt
+        )
+    }
+
+    private func acknowledgementAcceptance(from row: AcknowledgementAcceptanceRow) -> WellnessAcknowledgementAcceptance {
+        WellnessAcknowledgementAcceptance(
+            acknowledgementID: row.acknowledgementID,
+            version: row.version,
+            acceptedAt: row.acceptedAt
         )
     }
 

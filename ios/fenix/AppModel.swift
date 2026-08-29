@@ -9,6 +9,7 @@ import Foundation
 import Observation
 import UserNotifications
 
+@MainActor
 @Observable
 final class AppModel {
     enum AuthMode {
@@ -35,6 +36,7 @@ final class AppModel {
         case challenges
         case reports
         case checkIn
+        case acknowledgement
     }
 
     private let repository: GymBookingRepository
@@ -71,6 +73,8 @@ final class AppModel {
     var isRestoringSession = true
     var bookingMessage: String?
     var confirmationBooking: GymBooking?
+    var activeAcknowledgement = WellnessAcknowledgement.fallback
+    var acknowledgementAcceptance: WellnessAcknowledgementAcceptance?
     var hasAcceptedWellnessAcknowledgement = false
     var wellnessAcknowledgementAcceptedAt: Date?
     var authNotice: String?
@@ -210,7 +214,6 @@ final class AppModel {
         do {
             profile = try await repository.restoreSession()
             if profile != nil {
-                updateAcknowledgementState()
                 updateLocalSecurityState()
                 if localSecuritySettings.isEnabled {
                     isLocallyUnlocked = false
@@ -230,7 +233,6 @@ final class AppModel {
         await performLoading {
             profile = try await repository.signIn(email: email, password: password)
             authNotice = nil
-            updateAcknowledgementState()
             updateLocalSecurityState()
             isLocallyUnlocked = true
             try await refreshAfterAuth()
@@ -240,11 +242,11 @@ final class AppModel {
     func register(fullName: String, email: String, password: String, phone: String) async {
         await performLoading {
             profile = try await repository.register(fullName: fullName, email: email, password: password, phone: phone)
-            acceptWellnessAcknowledgement()
             authNotice = nil
             updateLocalSecurityState()
             isLocallyUnlocked = true
             try await refreshAfterAuth()
+            _ = try await acceptActiveAcknowledgement()
         }
     }
 
@@ -263,7 +265,6 @@ final class AppModel {
             authNotice = nil
             passwordRecoveryActive = true
             passwordRecoveryMessage = nil
-            updateAcknowledgementState()
             updateLocalSecurityState()
             isLocallyUnlocked = true
             try await refreshAfterAuth()
@@ -315,6 +316,8 @@ final class AppModel {
             confirmationBooking = nil
             passwordRecoveryActive = false
             passwordRecoveryMessage = nil
+            activeAcknowledgement = .fallback
+            acknowledgementAcceptance = nil
             hasAcceptedWellnessAcknowledgement = false
             wellnessAcknowledgementAcceptedAt = nil
             localSecuritySettings = LocalSecuritySettings(faceIDEnabled: false, pinEnabled: false)
@@ -469,11 +472,25 @@ final class AppModel {
         }
     }
 
-    func promoteAdmin(email: String) async {
-        await performLoading {
-            let admin = try await repository.promoteAdmin(email: email)
+    @discardableResult
+    func promoteAdmin(email: String) async -> Bool {
+        let cleanEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard cleanEmail.contains("@") && cleanEmail.contains(".") else {
+            setAccountMessage("Enter a valid email address.", scope: .access)
+            return false
+        }
+
+        loadState = .loading
+        do {
+            let admin = try await repository.promoteAdmin(email: cleanEmail)
             adminProfiles = try await repository.fetchAdminProfiles()
             setAccountMessage("\(admin.email) now has admin access.", scope: .access)
+            loadState = .idle
+            return true
+        } catch {
+            loadState = .idle
+            setAccountMessage(error.localizedDescription, scope: .access)
+            return false
         }
     }
 
@@ -502,13 +519,36 @@ final class AppModel {
             if let index = memberSearchResults.firstIndex(where: { $0.id == updated.id }) {
                 memberSearchResults[index] = updated
             }
-            setAccountMessage("\(updated.fullName) access updated.", scope: .members)
+            if accessStatus == .removed {
+                selectedMemberBookings = try await repository.fetchMemberBookings(userID: updated.id, limit: 100)
+                selectedMemberPrograms = try await repository.fetchPrograms(for: updated.id)
+                setAccountMessage("\(updated.fullName) access removed. Future bookings were cancelled and personal programs were archived.", scope: .members)
+            } else {
+                setAccountMessage("\(updated.fullName) access updated.", scope: .members)
+            }
             loadState = .idle
             return updated
         } catch {
             loadState = .failed(error.localizedDescription)
             setAccountMessage(error.localizedDescription, scope: .members)
             return nil
+        }
+    }
+
+    func deleteRemovedMemberLogin(_ member: UserProfile) async -> Bool {
+        loadState = .loading
+        do {
+            try await repository.deleteRemovedMemberLogin(member)
+            memberSearchResults.removeAll { $0.id == member.id }
+            selectedMemberBookings = []
+            selectedMemberPrograms = []
+            setAccountMessage("\(member.fullName)'s login account was deleted. If they return later, they will need to register again and be approved.", scope: .members)
+            loadState = .idle
+            return true
+        } catch {
+            loadState = .failed(error.localizedDescription)
+            setAccountMessage(error.localizedDescription, scope: .members)
+            return false
         }
     }
 
@@ -601,6 +641,15 @@ final class AppModel {
             myPrograms = try await repository.fetchPrograms(for: nil)
         } catch {
             setAccountMessage(error.localizedDescription, scope: .resources)
+        }
+    }
+
+    func refreshActiveAcknowledgement() async {
+        do {
+            activeAcknowledgement = try await repository.fetchActiveAcknowledgement()
+            updateAcknowledgementState()
+        } catch {
+            activeAcknowledgement = .fallback
         }
     }
 
@@ -845,15 +894,66 @@ final class AppModel {
         }
     }
 
-    func acceptWellnessAcknowledgement() {
+    func acceptWellnessAcknowledgement() async {
+        loadState = .loading
+        do {
+            _ = try await acceptActiveAcknowledgement()
+            loadState = .idle
+        } catch {
+            loadState = .failed(error.localizedDescription)
+            setAccountMessage(error.localizedDescription, scope: .acknowledgement)
+        }
+    }
+
+    func publishAcknowledgement(title: String, body: String, capacityText: String, fairUseText: String, medicalText: String) async {
+        await performLoading {
+            let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleanBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleanCapacity = capacityText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleanFairUse = fairUseText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleanMedical = medicalText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard !cleanTitle.isEmpty else { throw BookingError.remote("Add an acknowledgement title.") }
+            guard !cleanBody.isEmpty else { throw BookingError.remote("Add acknowledgement wording.") }
+            guard !cleanMedical.isEmpty else { throw BookingError.remote("Add the medical advice wording.") }
+            guard !cleanFairUse.isEmpty else { throw BookingError.remote("Add the fair use wording.") }
+
+            activeAcknowledgement = try await repository.publishAcknowledgement(
+                title: cleanTitle,
+                body: cleanBody,
+                capacityText: cleanCapacity,
+                fairUseText: cleanFairUse,
+                medicalText: cleanMedical
+            )
+            try await refreshAcknowledgementState()
+            setAccountMessage("Acknowledgement published. Members will accept the new version next time they open the app.", scope: .acknowledgement)
+        }
+    }
+
+    @discardableResult
+    private func acceptActiveAcknowledgement() async throws -> WellnessAcknowledgementAcceptance {
+        let acceptance = try await repository.acceptAcknowledgement(activeAcknowledgement)
+        acknowledgementAcceptance = acceptance
+        persistAcknowledgementFallback(acceptance)
+        updateAcknowledgementState()
+        return acceptance
+    }
+
+    private func refreshAcknowledgementState() async throws {
+        activeAcknowledgement = try await repository.fetchActiveAcknowledgement()
+        acknowledgementAcceptance = try await repository.fetchMyAcknowledgementAcceptance()
+        if acknowledgementAcceptance == nil, hasLocalAcknowledgementForActiveVersion() {
+            acknowledgementAcceptance = try? await repository.acceptAcknowledgement(activeAcknowledgement)
+        }
+        updateAcknowledgementState()
+    }
+
+    private func persistAcknowledgementFallback(_ acceptance: WellnessAcknowledgementAcceptance) {
         guard let userID = profile?.id else { return }
-        let acceptedAt = Date()
         let defaults = UserDefaults.standard
-        defaults.set(Self.wellnessAcknowledgementVersion, forKey: acknowledgementVersionKey(for: userID))
-        defaults.set(acceptedAt, forKey: acknowledgementAcceptedAtKey(for: userID))
+        defaults.set(acceptance.version, forKey: acknowledgementVersionKey(for: userID))
+        defaults.set(acceptance.acceptedAt, forKey: acknowledgementAcceptedAtKey(for: userID))
         defaults.removeObject(forKey: acknowledgementKey(for: userID))
-        hasAcceptedWellnessAcknowledgement = true
-        wellnessAcknowledgementAcceptedAt = acceptedAt
     }
 
     private func updateAcknowledgementState() {
@@ -869,8 +969,16 @@ final class AppModel {
             defaults.set(Self.wellnessAcknowledgementVersion, forKey: acknowledgementVersionKey(for: userID))
             defaults.set(migratedAt, forKey: acknowledgementAcceptedAtKey(for: userID))
         }
-        hasAcceptedWellnessAcknowledgement = defaults.string(forKey: acknowledgementVersionKey(for: userID)) == Self.wellnessAcknowledgementVersion
-        wellnessAcknowledgementAcceptedAt = defaults.object(forKey: acknowledgementAcceptedAtKey(for: userID)) as? Date
+        let dbAcceptanceMatches = acknowledgementAcceptance?.acknowledgementID == activeAcknowledgement.id
+        let localAcceptanceMatches = defaults.string(forKey: acknowledgementVersionKey(for: userID)) == activeAcknowledgement.version
+        hasAcceptedWellnessAcknowledgement = dbAcceptanceMatches || localAcceptanceMatches
+        wellnessAcknowledgementAcceptedAt = acknowledgementAcceptance?.acceptedAt ?? defaults.object(forKey: acknowledgementAcceptedAtKey(for: userID)) as? Date
+    }
+
+    private func hasLocalAcknowledgementForActiveVersion() -> Bool {
+        guard let userID = profile?.id else { return false }
+        let defaults = UserDefaults.standard
+        return defaults.string(forKey: acknowledgementVersionKey(for: userID)) == activeAcknowledgement.version
     }
 
     private func acknowledgementKey(for userID: UUID) -> String {
@@ -911,20 +1019,21 @@ final class AppModel {
     private func refreshAfterAuth() async throws {
         rules = try await repository.fetchRules()
         openingHours = try await repository.fetchOpeningHours()
-            facilityContact = try await repository.fetchFacilityContact()
-            availability = try await repository.fetchAvailability(for: selectedDate, durationMinutes: selectedDuration)
-            bookings = try await repository.fetchBookings()
-            resources = try await repository.fetchResources()
-            myPrograms = try await repository.fetchPrograms(for: nil)
-            challenges = try await repository.fetchChallenges(includeDrafts: canShowAdmin)
-            if canShowAdmin {
-                adminBookings = try await repository.fetchAdminBookings(for: selectedDate)
-                adminProfiles = try await repository.fetchAdminProfiles()
-                blackoutPeriods = try await repository.fetchBlackoutPeriods()
-                memberSearchResults = try await repository.searchMembers(query: "")
-                auditLog = try await repository.fetchAuditLog(limit: 50)
-            }
+        facilityContact = try await repository.fetchFacilityContact()
+        try await refreshAcknowledgementState()
+        availability = try await repository.fetchAvailability(for: selectedDate, durationMinutes: selectedDuration)
+        bookings = try await repository.fetchBookings()
+        resources = try await repository.fetchResources()
+        myPrograms = try await repository.fetchPrograms(for: nil)
+        challenges = try await repository.fetchChallenges(includeDrafts: canShowAdmin)
+        if canShowAdmin {
+            adminBookings = try await repository.fetchAdminBookings(for: selectedDate)
+            adminProfiles = try await repository.fetchAdminProfiles()
+            blackoutPeriods = try await repository.fetchBlackoutPeriods()
+            memberSearchResults = try await repository.searchMembers(query: "")
+            auditLog = try await repository.fetchAuditLog(limit: 50)
         }
+    }
 
     private func performLoading(_ operation: () async throws -> Void) async {
         loadState = .loading

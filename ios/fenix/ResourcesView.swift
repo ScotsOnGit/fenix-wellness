@@ -112,7 +112,7 @@ struct ResourceLinkRow: View {
     }
 
     private func openResource() async {
-        if type == .link, let linkURL = URL(string: url) {
+        if type == .link, let linkURL = FenixURLValidator.webURL(from: url) {
             await MainActor.run { openURL(linkURL) }
             return
         }

@@ -70,6 +70,7 @@ struct ProfileView: View {
                     if let acceptedAt = appModel.wellnessAcknowledgementAcceptedAt {
                         LabeledContent("Acknowledged", value: FacilityTime.dateText(acceptedAt))
                     }
+                    LabeledContent("Version", value: appModel.activeAcknowledgement.version)
                     NavigationLink {
                         WellnessAcknowledgementDetailView()
                     } label: {
