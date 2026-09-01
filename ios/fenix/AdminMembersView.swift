@@ -126,6 +126,8 @@ struct AdminMemberDetailView: View {
     }
 
     private var shouldShowApproveButton: Bool {
+        // "Approve member" is a shortcut for the common admin action: make the account
+        // active and mark induction complete in one tap.
         displayedMember.accessStatus == .pending || displayedMember.inductionCompletedAt == nil
     }
 
@@ -345,6 +347,8 @@ struct AdminMemberDetailView: View {
         }
         .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf], allowsMultipleSelection: false) { result in
             if case let .success(urls) = result, let url = urls.first {
+                // Files selected from outside the app sandbox must be opened through a
+                // temporary security-scoped permission before reading their data.
                 let didAccess = url.startAccessingSecurityScopedResource()
                 defer {
                     if didAccess { url.stopAccessingSecurityScopedResource() }

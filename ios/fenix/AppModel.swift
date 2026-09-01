@@ -43,6 +43,8 @@ final class AppModel {
     private let localSecurity = LocalSecurityManager.shared
     private let reminders = SessionReminderManager.shared
 
+    // Kept for migrating the first locally-stored acknowledgement into the newer
+    // database-backed acknowledgement versioning system.
     static let wellnessAcknowledgementVersion = "2026-06-06-v1"
 
     var profile: UserProfile?
@@ -123,6 +125,8 @@ final class AppModel {
     }
 
     var usedBookingForSelectedDate: GymBooking? {
+        // The one-session-per-day rule applies after attendance too, so completed
+        // sessions still block another same-day booking while cancelled sessions do not.
         bookings
             .filter { $0.cancelledAt == nil && FacilityTime.calendar.isDate($0.startTime, inSameDayAs: selectedDate) }
             .sorted { $0.startTime < $1.startTime }
@@ -290,6 +294,8 @@ final class AppModel {
         await performLoading {
             try await repository.signOut()
             if let signedOutUserID {
+                // Local unlock settings belong to the signed-in person, not the device
+                // globally. Clearing them on sign-out avoids another user inheriting access.
                 try? localSecurity.disableAll(for: signedOutUserID)
                 reminders.cancelAll(for: signedOutUserID)
             }
@@ -520,6 +526,9 @@ final class AppModel {
                 memberSearchResults[index] = updated
             }
             if accessStatus == .removed {
+                // The database function performs the destructive part of removal:
+                // cancelling future bookings and archiving personal program assignments.
+                // The extra fetches keep this screen honest after the server-side cleanup.
                 selectedMemberBookings = try await repository.fetchMemberBookings(userID: updated.id, limit: 100)
                 selectedMemberPrograms = try await repository.fetchPrograms(for: updated.id)
                 setAccountMessage("\(updated.fullName) access removed. Future bookings were cancelled and personal programs were archived.", scope: .members)
@@ -575,6 +584,8 @@ final class AppModel {
         accountMessage = message
         accountMessageScope = scope
         Task {
+            // Messages are scoped so a success toast from one admin screen does not
+            // follow the user around the rest of the app.
             try? await Task.sleep(for: .seconds(4))
             if accountMessage == message && accountMessageScope == scope {
                 clearAccountMessage()
@@ -840,6 +851,8 @@ final class AppModel {
         Task {
             await refreshAvailability()
             if let previousStartTime {
+                // Preserve the selected start time when changing duration, but only if
+                // the refreshed server availability says that start is still bookable.
                 selectedSlot = availability.first {
                     $0.startTime == previousStartTime &&
                     $0.status != .full
@@ -849,6 +862,8 @@ final class AppModel {
     }
 
     func createSelectedBooking() async {
+        // Client-side checks are for clear feedback only. The create_booking RPC is the
+        // final authority for induction, capacity, blackout, hours, and one-per-day rules.
         guard profile?.canBookWellnessSessions == true else {
             bookingMessage = BookingError.accessPending.localizedDescription
             return
@@ -943,6 +958,8 @@ final class AppModel {
         activeAcknowledgement = try await repository.fetchActiveAcknowledgement()
         acknowledgementAcceptance = try await repository.fetchMyAcknowledgementAcceptance()
         if acknowledgementAcceptance == nil, hasLocalAcknowledgementForActiveVersion() {
+            // Older builds stored acknowledgement acceptance only on-device. If the
+            // local version matches the active database wording, silently backfill it.
             acknowledgementAcceptance = try? await repository.acceptAcknowledgement(activeAcknowledgement)
         }
         updateAcknowledgementState()
@@ -1017,6 +1034,8 @@ final class AppModel {
     }
 
     private func refreshAfterAuth() async throws {
+        // This is the single "signed-in bootstrap" refresh. Keeping the sequence in one
+        // place prevents different tabs from drifting into different app state.
         rules = try await repository.fetchRules()
         openingHours = try await repository.fetchOpeningHours()
         facilityContact = try await repository.fetchFacilityContact()
@@ -1036,6 +1055,8 @@ final class AppModel {
     }
 
     private func performLoading(_ operation: () async throws -> Void) async {
+        // Most user actions use a shared loading/error state so the UI can show one
+        // consistent busy state while still surfacing the server's exact error message.
         loadState = .loading
         do {
             try await operation()
@@ -1071,6 +1092,8 @@ final class SessionReminderManager {
 
         Task {
             do {
+                // Local notifications are device-side reminders only. They still fire if
+                // the app is force-closed, as long as iOS has accepted the request.
                 let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
                 guard granted else { return }
 

@@ -104,6 +104,8 @@ struct FenixLoadingView: View {
 }
 
 enum FacilityTime {
+    // The facility operates on Perth time regardless of the device's current region.
+    // Keep booking/date calculations on this calendar to avoid FIFO travel edge cases.
     static let timeZone = TimeZone(identifier: "Australia/Perth")!
 
     static var calendar: Calendar {
@@ -308,6 +310,7 @@ struct UserProfile: Identifiable, Equatable, Sendable {
     }
 
     var canBookWellnessSessions: Bool {
+        // Admins can test/manage booking flows; members must be both active and inducted.
         role == .admin || (accessStatus.canBook && inductionCompletedAt != nil)
     }
 }
@@ -383,6 +386,8 @@ struct GymBooking: Identifiable, Equatable, Sendable {
     }
 
     var attendanceStatus: AttendanceStatus {
+        // Cancellation is represented by BookingStatus; this value only describes
+        // attendance for bookings that were allowed to proceed.
         if noShowMarkedAt != nil {
             return .noShow
         }
@@ -429,6 +434,8 @@ struct AvailabilitySlot: Identifiable, Equatable, Sendable {
         if occupiedCount >= capacity {
             return .full
         }
+        // Nearly-full is a visual cue only. Capacity and write safety are enforced by
+        // the database RPCs when a booking is created.
         if occupiedCount >= 15 {
             return .nearlyFull
         }
@@ -573,6 +580,8 @@ struct WellbeingChallenge: Identifiable, Equatable, Sendable {
     var createdAt: Date
 
     var status: ChallengeStatus {
+        // Draft challenges remain admin-only even if their dates would otherwise make
+        // them upcoming or active.
         if !isPublished {
             return .draft
         }

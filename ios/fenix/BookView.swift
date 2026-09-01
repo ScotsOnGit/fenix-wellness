@@ -160,6 +160,8 @@ struct BookView: View {
     }
 
     private func bookingCovering(_ slot: AvailabilitySlot) -> GymBooking? {
+        // Used only to paint the member's own booking across the grid. It should never
+        // be used for capacity math because Supabase is the source of truth there.
         appModel.bookings.first { booking in
             booking.status == .active &&
             booking.cancelledAt == nil &&
@@ -358,6 +360,8 @@ struct SlotButton: View {
     }
 
     private var detailText: String {
+        // Only forward slots inside the user's actual booking say "Booked". Earlier
+        // starts may show reduced availability for longer durations, but not ownership.
         guard let userBooking else {
             return "\(slot.remaining) for \(selectedDuration)m"
         }
@@ -464,6 +468,8 @@ struct BookingConfirmationView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Book") {
                         Task {
+                            // Re-check the local gate right before calling the server so
+                            // stale sheets cannot submit after a state refresh.
                             guard appModel.canReviewSelectedBooking else { return }
                             dismiss()
                             await appModel.createSelectedBooking()
