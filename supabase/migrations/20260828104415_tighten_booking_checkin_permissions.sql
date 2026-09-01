@@ -65,7 +65,7 @@ begin
         return 'Your staff profile could not be found.';
     end if;
     if profile.access_status <> 'active' or profile.induction_completed_at is null then
-        return 'Your wellness centre access is pending admin induction approval.';
+        return 'Your wellbeing facility access is pending admin induction approval.';
     end if;
 
     if p_end_time <= p_start_time then
@@ -103,7 +103,7 @@ begin
         where oh.weekday = local_weekday
           and (oh.is_closed or local_start_time < oh.opens_at or local_end_time > oh.closes_at or local_end::date <> local_date)
     ) then
-        return 'This session is outside wellness centre opening hours.';
+        return 'This session is outside wellbeing facility opening hours.';
     end if;
 
     if exists (
@@ -245,13 +245,13 @@ declare
     target_booking public.bookings;
 begin
     if not app_private.current_user_is_active_member() then
-        raise exception 'Active wellness centre access is required to check in.';
+        raise exception 'Active wellbeing facility access is required to check in.';
     end if;
 
     select * into rules from public.facility_rules where id = true;
 
     if rules.check_in_code is null or trim(p_code) <> rules.check_in_code then
-        raise exception 'This QR code is not valid for the wellness centre.';
+        raise exception 'This QR code is not valid for the wellbeing facility.';
     end if;
 
     select * into target_booking

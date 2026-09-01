@@ -74,7 +74,7 @@ struct PasswordRecoveryView: View {
                 Text("Reset Password")
                     .font(.title.weight(.bold))
                     .foregroundStyle(.white)
-                Text("Enter a new password for your wellness centre account.")
+                Text("Enter a new password for your wellbeing facility account.")
                     .font(.body)
                     .foregroundStyle(FenixTheme.darkSecondaryText)
                     .multilineTextAlignment(.center)
@@ -310,7 +310,7 @@ struct WellnessAcknowledgementContent: View {
                 AcknowledgementPoint(
                     icon: "person.3.fill",
                     title: "Capacity",
-                    text: acknowledgement.capacityText.isEmpty ? "The wellness centre is limited to \(rules.capacity) people at a time." : acknowledgement.capacityText
+                    text: acknowledgement.capacityText.isEmpty ? "The wellbeing facility is limited to \(rules.capacity) people at a time." : acknowledgement.capacityText
                 )
                 AcknowledgementPoint(
                     icon: "calendar.badge.clock",

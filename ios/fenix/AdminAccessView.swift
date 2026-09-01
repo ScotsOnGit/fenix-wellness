@@ -45,7 +45,7 @@ struct AdminAccessView: View {
             } header: {
                 Text("Add Admin")
             } footer: {
-                Text("The staff member must already have a registered account. Admin access should only be given to trusted users who manage bookings and wellness centre settings.")
+                Text("The staff member must already have a registered account. Admin access should only be given to trusted users who manage bookings and wellbeing facility settings.")
             }
             .listRowBackground(FenixTheme.darkCard)
 

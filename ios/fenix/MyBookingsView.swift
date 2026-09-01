@@ -166,7 +166,7 @@ struct BookingRow: View {
                     }
                     .buttonStyle(.borderless)
                     .padding(.top, 2)
-                    .accessibilityHint("Cancels this wellness centre booking after confirmation.")
+                    .accessibilityHint("Cancels this wellbeing facility booking after confirmation.")
                 } else {
                     Label("Cancellation cutoff has passed.", systemImage: "lock")
                         .font(.footnote.weight(.semibold))

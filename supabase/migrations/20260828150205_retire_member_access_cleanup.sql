@@ -1,4 +1,4 @@
--- Treat the Removed access state as staff offboarding from the wellness centre.
+-- Treat the Removed access state as staff offboarding from the wellbeing facility.
 -- Past history remains for reporting, while future access, future bookings, and
 -- personal program links are retired in one admin action.
 

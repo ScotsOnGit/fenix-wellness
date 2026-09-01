@@ -37,7 +37,7 @@ struct CheckInView: View {
                     }
                     .padding(.vertical, 4)
                 } else {
-                    Text("Scan the wellness centre QR code when you arrive for your booked session.")
+                    Text("Scan the wellbeing facility QR code when you arrive for your booked session.")
                         .foregroundStyle(FenixTheme.darkSecondaryText)
                 }
             }

@@ -1,4 +1,4 @@
--- Versioned acknowledgement wording for the wellness centre.
+-- Versioned acknowledgement wording for the wellbeing facility.
 -- Admins can publish new versions; members accept the active version once per version.
 
 create table if not exists public.wellness_acknowledgements (
@@ -113,9 +113,9 @@ insert into public.wellness_acknowledgements (
 )
 select
     '2026-06-06-v1',
-    'Wellness Centre Acknowledgement',
-    'Please read and acknowledge this before using the wellness centre. Use of the facility is voluntary and at your own risk.',
-    'The wellness centre is limited to 20 people at a time.',
+    'Wellbeing Facility Acknowledgement',
+    'Please read and acknowledge this before using the wellbeing facility. Use of the facility is voluntary and at your own risk.',
+    'The wellbeing facility is limited to 20 people at a time.',
     'To keep access fair, each staff member can book one session per day, up to 7 days in advance.',
     'If you have a medical condition, injury, or any concern about exercise, seek medical advice before using the facility.',
     true,

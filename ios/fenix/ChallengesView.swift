@@ -117,7 +117,7 @@ private struct ChallengeDetailView: View {
             .listRowBackground(FenixTheme.darkCard)
 
             Section("Rules") {
-                Text(challenge.rules.isEmpty ? "Follow the challenge instructions set by the wellness centre team." : challenge.rules)
+                Text(challenge.rules.isEmpty ? "Follow the challenge instructions set by the wellbeing facility team." : challenge.rules)
                     .foregroundStyle(FenixTheme.darkSecondaryText)
             }
             .listRowBackground(FenixTheme.darkCard)

@@ -316,7 +316,7 @@ struct AdminMemberDetailView: View {
         }
         .task { await appModel.refreshMemberDetail(displayedMember) }
         .confirmationDialog(
-            "Remove wellness centre access?",
+            "Remove wellbeing facility access?",
             isPresented: $showingRemoveAccessConfirmation,
             titleVisibility: .visible
         ) {

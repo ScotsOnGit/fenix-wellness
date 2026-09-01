@@ -190,7 +190,7 @@ struct AdminOperationsView: View {
                     AdminWellnessContactView()
                 } label: {
                     AdminOperationsLinkRow(
-                        title: "Wellness Centre Information",
+                        title: "Wellbeing Facility Information",
                         subtitle: "Contact details shown to staff in their profile.",
                         systemImage: "info.circle"
                     )
@@ -201,7 +201,7 @@ struct AdminOperationsView: View {
                 } label: {
                     AdminOperationsLinkRow(
                         title: "Acknowledgement",
-                        subtitle: "Edit the wording staff must accept before using the centre.",
+                        subtitle: "Edit the wording staff must accept before using the facility.",
                         systemImage: "checkmark.seal"
                     )
                 }
@@ -220,7 +220,7 @@ struct AdminOperationsView: View {
                     AdminResourcesView()
                 } label: {
                     AdminOperationsLinkRow(
-                        title: "Wellness Resources",
+                        title: "Wellbeing Resources",
                         subtitle: "Publish shared links and PDFs for staff.",
                         systemImage: "doc.text"
                     )
@@ -427,7 +427,7 @@ private struct AdminWellnessContactView: View {
                 .listRowBackground(FenixTheme.darkCard)
             }
         }
-        .adminListStyle(title: "Centre Info")
+        .adminListStyle(title: "Facility Info")
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
@@ -540,7 +540,7 @@ private struct AdminAcknowledgementView: View {
         WellnessAcknowledgement(
             id: appModel.activeAcknowledgement.id,
             version: appModel.activeAcknowledgement.version,
-            title: title.isEmpty ? "Wellness Centre Acknowledgement" : title,
+            title: title.isEmpty ? "Wellbeing Facility Acknowledgement" : title,
             body: acknowledgementBody,
             capacityText: capacityText,
             fairUseText: fairUseText,

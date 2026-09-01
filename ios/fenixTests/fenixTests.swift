@@ -33,7 +33,7 @@ struct fenixTests {
     }
 
     @MainActor
-    @Test func availabilityUsesWellnessCentreHours() async throws {
+    @Test func availabilityUsesWellbeingFacilityHours() async throws {
         let repository = MockGymBookingRepository()
         let calendar = FacilityTime.calendar
         let targetDay = calendar.date(byAdding: .day, value: 2, to: calendar.startOfDay(for: Date())) ?? Date()
@@ -50,7 +50,7 @@ struct fenixTests {
     }
 
     @MainActor
-    @Test func mockRepositoryRejectsBookingsOutsideWellnessCentreHours() async throws {
+    @Test func mockRepositoryRejectsBookingsOutsideWellbeingFacilityHours() async throws {
         let repository = MockGymBookingRepository()
         _ = try await repository.signIn(email: "member@fenix.com.au", password: "password123")
 

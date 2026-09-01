@@ -504,7 +504,7 @@ final class MockGymBookingRepository: GymBookingRepository {
         try await shortDelay()
         guard let profile = signedInProfile else { throw BookingError.unauthenticated }
         guard code.trimmingCharacters(in: .whitespacesAndNewlines) == "FENIX-WELLNESS-CENTRE" else {
-            throw BookingError.remote("This QR code is not valid for the wellness centre.")
+            throw BookingError.remote("This QR code is not valid for the wellbeing facility.")
         }
         guard let index = bookings.firstIndex(where: {
             $0.userID == profile.id &&

@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Fenix Wellness Centre</string>
+	<string>Fenix Wellbeing Facility</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -36,9 +36,9 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.healthcare-fitness</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Scan the wellness centre QR code to check in for your session.</string>
+	<string>Scan the wellbeing facility QR code to check in for your session.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Use Face ID to unlock the Fenix Wellness Centre app.</string>
+	<string>Use Face ID to unlock the Fenix Wellbeing Facility app.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

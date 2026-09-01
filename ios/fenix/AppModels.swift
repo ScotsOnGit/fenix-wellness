@@ -32,7 +32,7 @@ enum FenixTheme {
 }
 
 enum FenixBrand {
-    static let appName = "Fenix Wellness Centre"
+    static let appName = "Fenix Wellbeing Facility"
     static let passwordResetRedirectURL = URL(string: "fenixwellness://password-reset")!
 }
 
@@ -217,11 +217,11 @@ struct FacilityContact: Equatable, Sendable {
     var notes: String
 
     static let fenixDefault = FacilityContact(
-        displayName: "Fenix Wellness Centre",
+        displayName: "Fenix Wellbeing Facility",
         address: "",
         phone: "",
         email: "",
-        notes: "Contact your Fenix admin or HR team for wellness centre support."
+        notes: "Contact your Fenix admin or HR team for wellbeing facility support."
     )
 }
 
@@ -241,9 +241,9 @@ struct WellnessAcknowledgement: Identifiable, Equatable, Sendable {
     static let fallback = WellnessAcknowledgement(
         id: UUID(uuidString: "FEE00000-0000-4000-8000-000000000100")!,
         version: "2026-06-06-v1",
-        title: "Wellness Centre Acknowledgement",
-        body: "Please read and acknowledge this before using the wellness centre. Use of the facility is voluntary and at your own risk.",
-        capacityText: "The wellness centre is limited to 20 people at a time.",
+        title: "Wellbeing Facility Acknowledgement",
+        body: "Please read and acknowledge this before using the wellbeing facility. Use of the facility is voluntary and at your own risk.",
+        capacityText: "The wellbeing facility is limited to 20 people at a time.",
         fairUseText: "To keep access fair, each staff member can book one session per day, up to 7 days in advance.",
         medicalText: "If you have a medical condition, injury, or any concern about exercise, seek medical advice before using the facility.",
         isActive: true,
@@ -470,7 +470,7 @@ enum BookingError: LocalizedError, Equatable {
         case .slotFull:
             "This start time is now full. Refresh availability and choose another time."
         case .outsideOpeningHours:
-            "This session extends outside wellness centre hours."
+            "This session extends outside wellbeing facility hours."
         case .maxDailyBookings:
             "You already have a booking on this day."
         case .maxFutureBookings:
@@ -478,7 +478,7 @@ enum BookingError: LocalizedError, Equatable {
         case .cancellationCutoff:
             "Bookings can only be cancelled when more than 60 minutes remain."
         case .accessPending:
-            "Your wellness centre access is pending admin induction approval."
+            "Your wellbeing facility access is pending admin induction approval."
         case .unauthenticated:
             "Please sign in again to continue."
         case let .remote(message):

@@ -135,7 +135,7 @@ final class AppModel {
 
     var bookingUnavailableReason: String? {
         if let profile, !profile.canBookWellnessSessions {
-            return "Your wellness centre access is pending admin induction approval."
+            return "Your wellbeing facility access is pending admin induction approval."
         }
         if let booking = usedBookingForSelectedDate {
             switch booking.status {
@@ -169,8 +169,8 @@ final class AppModel {
 
         if let hours = selectedDateOpeningHours, hours.isClosed {
             return (
-                "Centre closed",
-                "The wellness centre is closed on this day. Choose another date.",
+                "Facility closed",
+                "The wellbeing facility is closed on this day. Choose another date.",
                 "door.left.hand.closed"
             )
         }
@@ -328,7 +328,7 @@ final class AppModel {
 
     func unlockWithBiometrics() async {
         do {
-            try await localSecurity.authenticateWithBiometrics(reason: "Unlock Fenix Wellness Centre")
+            try await localSecurity.authenticateWithBiometrics(reason: "Unlock Fenix Wellbeing Facility")
             isLocallyUnlocked = true
             clearAccountMessage()
             await refreshAll()
@@ -427,7 +427,7 @@ final class AppModel {
     func updateFacilityContact(_ contact: FacilityContact) async {
         await performLoading {
             facilityContact = try await repository.updateFacilityContact(contact)
-            setAccountMessage("Wellness centre contact details updated.", scope: .contact)
+            setAccountMessage("Wellbeing facility contact details updated.", scope: .contact)
         }
     }
 
