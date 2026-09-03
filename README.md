@@ -1,6 +1,6 @@
-# Fenix Wellness Centre
+# Fenix Wellbeing Facility
 
-The Fenix Wellness Centre mobile system: a native iOS app, the future native Android app, and a shared Supabase/Postgres backend. Staff can register, complete an induction acknowledgement, book gym sessions, check in with a QR code, access resources and wellbeing challenges, and manage their profile. Administrators manage members, bookings, hours, closures, resources, challenges, reports, and audit information.
+The Fenix Wellbeing Facility mobile system: a native iOS app, the future native Android app, and a shared Supabase/Postgres backend. Staff can register, complete an induction acknowledgement, book sessions, check in with a QR code, access resources and wellbeing challenges, and manage their profile. Administrators manage members, bookings, hours, closures, resources, challenges, reports, and audit information.
 
 ## Handover at a glance
 
@@ -10,10 +10,10 @@ This repository is private and intentionally contains **no live Supabase credent
 | --- | --- | --- |
 | iOS | [`ios/`](ios) | Native SwiftUI implementation included |
 | Android | [`android/`](android) | Native Kotlin/Compose auth and booking foundation included |
-| Database | [`supabase/`](supabase) | Feature migrations included; baseline schema recovery required |
+| Database | [`supabase/`](supabase) | Full fresh-project SQL and migration history included |
 | Original product brief | [`docs/source-brief/`](docs/source-brief) | Reference material |
 
-> **Release gate:** do not point either app at a new Supabase project until a complete baseline migration is restored and the entire migration sequence has passed against an empty test project. Details are in [`supabase/README.md`](supabase/README.md).
+> **Release gate:** test the supplied full setup SQL against a disposable Supabase project before pointing production mobile apps at it. Details are in [`supabase/README.md`](supabase/README.md).
 
 ## Repository layout
 
@@ -21,7 +21,7 @@ This repository is private and intentionally contains **no live Supabase credent
 .
 ├── ios/                 SwiftUI/Xcode application and tests
 ├── android/             Android port location and implementation notes
-├── supabase/migrations/ Versioned database feature migrations
+├── supabase/            Full setup SQL, migrations, and Edge Function
 └── docs/                Handover reference material
 ```
 
@@ -29,7 +29,7 @@ This repository is private and intentionally contains **no live Supabase credent
 
 The database, not the mobile interface, is the source of truth for these rules:
 
-- A maximum of 20 concurrent gym users.
+- A maximum of 20 concurrent facility users.
 - Bookings begin on 15-minute boundaries and use permitted durations.
 - A booking window limited to seven days, one active booking per day, and five future bookings.
 - No overlapping bookings; cancellations only strictly more than one hour before the session.
@@ -48,7 +48,7 @@ The database, not the mobile interface, is the source of truth for these rules:
 
 ### 2. Provision Supabase
 
-Follow [`supabase/README.md`](supabase/README.md) exactly. In brief: restore the missing baseline migration, link the CLI to the new project, apply the full migration history with `supabase db push`, then test the booking and RLS flows using non-admin and admin accounts.
+Follow [`supabase/README.md`](supabase/README.md) exactly. In brief: create a fresh Supabase project, run `supabase/fenix_full_setup.sql`, deploy the `delete-removed-member` Edge Function, then test booking, induction, admin, resources, challenges, and RLS flows using non-admin and admin accounts.
 
 In the Supabase Dashboard:
 
@@ -89,7 +89,7 @@ Use an Android-specific deep-link callback and add an intent filter that precise
 
 ## Pre-release checklist
 
-- [ ] Complete baseline schema is committed and a fresh project can be provisioned from git alone.
+- [ ] A fresh Supabase project can be provisioned from `supabase/fenix_full_setup.sql`.
 - [ ] RLS policies and admin/member permissions tested with real test accounts.
 - [ ] iOS and Android use the receiving company’s project URL and publishable key.
 - [ ] Both mobile deep-link callback URIs are allow-listed in Supabase Auth.
