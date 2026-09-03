@@ -171,7 +171,7 @@ declare
     participant public.wellbeing_challenge_participants;
 begin
     if not app_private.current_user_is_active_member() then
-        raise exception 'Active wellness centre access is required to join challenges.';
+        raise exception 'Active wellbeing facility access is required to join challenges.';
     end if;
 
     select * into challenge
@@ -208,7 +208,7 @@ declare
     entry public.wellbeing_challenge_entries;
 begin
     if not app_private.current_user_is_active_member() then
-        raise exception 'Active wellness centre access is required to log challenge progress.';
+        raise exception 'Active wellbeing facility access is required to log challenge progress.';
     end if;
 
     if p_value <= 0 then

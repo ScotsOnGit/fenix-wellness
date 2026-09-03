@@ -24,7 +24,7 @@ struct AdminResourcesView: View {
 
     private var canSave: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            (resourceType == .link ? URL(string: url) != nil : pdfData != nil)
+            (resourceType == .link ? FenixURLValidator.webURL(from: url) != nil : pdfData != nil)
     }
 
     var body: some View {

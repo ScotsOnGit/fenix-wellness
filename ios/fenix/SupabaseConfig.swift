@@ -7,31 +7,31 @@
 
 import Foundation
 
-/// Project-specific values are deliberately kept out of source control.
-/// Copy `SupabaseConfig.plist.example` to `SupabaseConfig.plist`, add it to the
-/// app target, and supply the values from the receiving organisation's project.
 enum SupabaseConfig {
-    private static let values: [String: Any] = {
-        guard
-            let url = Bundle.main.url(forResource: "SupabaseConfig", withExtension: "plist"),
-            let values = NSDictionary(contentsOf: url) as? [String: Any]
-        else {
-            preconditionFailure("Missing SupabaseConfig.plist. Follow the repository README before running the app.")
-        }
-        return values
-    }()
-
-    nonisolated static let projectURL: URL = {
-        guard let value = values["ProjectURL"] as? String, let url = URL(string: value) else {
-            preconditionFailure("SupabaseConfig.plist has no valid ProjectURL.")
+    nonisolated static var projectURL: URL {
+        guard let url = URL(string: stringValue(for: "ProjectURL")),
+              url.scheme == "https",
+              url.host?.isEmpty == false else {
+            preconditionFailure("Set ProjectURL in SupabaseConfig.plist from the receiving company's Supabase project.")
         }
         return url
-    }()
+    }
 
-    nonisolated static let publishableKey: String = {
-        guard let value = values["PublishableKey"] as? String, !value.isEmpty else {
-            preconditionFailure("SupabaseConfig.plist has no PublishableKey.")
+    nonisolated static var publishableKey: String {
+        let key = stringValue(for: "PublishableKey")
+        guard !key.isEmpty, !key.contains("REPLACE_WITH") else {
+            preconditionFailure("Set PublishableKey in SupabaseConfig.plist from the receiving company's Supabase project.")
+        }
+        return key
+    }
+
+    private nonisolated static func stringValue(for key: String) -> String {
+        guard let url = Bundle.main.url(forResource: "SupabaseConfig", withExtension: "plist"),
+              let data = try? Data(contentsOf: url),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String],
+              let value = plist[key]?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            preconditionFailure("Copy SupabaseConfig.plist.example to SupabaseConfig.plist and set \(key).")
         }
         return value
-    }()
+    }
 }

@@ -12,6 +12,9 @@ val localProperties = Properties().apply {
     if (file.exists()) file.inputStream().use(::load)
 }
 
+val defaultSupabaseUrl = "https://oknlivhuuhhmnddaxcrq.supabase.co"
+val defaultSupabasePublishableKey = "sb_publishable_mQj7tTnRfQ9ffNoMUSlkLA_HeqU7GGi"
+
 android {
     namespace = "com.fenixresources.wellness"
     compileSdk = 35
@@ -24,8 +27,8 @@ android {
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("SUPABASE_URL", "")}\"")
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "")}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("SUPABASE_URL", defaultSupabaseUrl)}\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", defaultSupabasePublishableKey)}\"")
     }
 
     buildFeatures { buildConfig = true; compose = true }

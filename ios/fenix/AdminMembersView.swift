@@ -93,6 +93,7 @@ private struct AdminMemberRow: View {
 
 struct AdminMemberDetailView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.dismiss) private var dismiss
     let member: UserProfile
 
     @State private var displayedMember: UserProfile
@@ -105,6 +106,8 @@ struct AdminMemberDetailView: View {
     @State private var pdfData: Data?
     @State private var pdfFileName: String?
     @State private var importingPDF = false
+    @State private var showingRemoveAccessConfirmation = false
+    @State private var showingDeleteLoginConfirmation = false
 
     init(member: UserProfile) {
         self.member = member
@@ -123,12 +126,15 @@ struct AdminMemberDetailView: View {
     }
 
     private var shouldShowApproveButton: Bool {
+        // "Approve member" is a shortcut for the common admin action: make the account
+        // active and mark induction complete in one tap.
         displayedMember.accessStatus == .pending || displayedMember.inductionCompletedAt == nil
     }
 
     private var canAssignProgram: Bool {
-        !programTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            (programType == .link ? URL(string: programURL) != nil : pdfData != nil)
+        displayedMember.accessStatus != .removed &&
+            !programTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            (programType == .link ? FenixURLValidator.webURL(from: programURL) != nil : pdfData != nil)
     }
 
     var body: some View {
@@ -148,6 +154,18 @@ struct AdminMemberDetailView: View {
                 }
                 Toggle("Induction complete", isOn: $inductionComplete)
                     .tint(FenixTheme.orange)
+                    .disabled(selectedStatus == .removed)
+
+                if selectedStatus == .removed {
+                    Label {
+                        Text("Removing access cancels future sessions and archives personal program links/PDF assignments. Past booking history is kept for reporting.")
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(FenixTheme.amber)
+                    .accessibilityLabel("Removing access cancels future sessions and archives personal programs. Past booking history is kept for reporting.")
+                }
 
                 if shouldShowApproveButton {
                     Button {
@@ -165,9 +183,13 @@ struct AdminMemberDetailView: View {
                 }
 
                 Button {
-                    Task { await saveAccess(status: selectedStatus, inductionComplete: inductionComplete) }
+                    if selectedStatus == .removed {
+                        showingRemoveAccessConfirmation = true
+                    } else {
+                        Task { await saveAccess(status: selectedStatus, inductionComplete: inductionComplete) }
+                    }
                 } label: {
-                    Label(accessIsDirty ? "Save access changes" : "Access is up to date", systemImage: "checkmark.circle")
+                    Label(accessButtonTitle, systemImage: selectedStatus == .removed ? "person.crop.circle.badge.xmark" : "checkmark.circle")
                 }
                 .disabled(!canSaveAccess)
 
@@ -178,6 +200,23 @@ struct AdminMemberDetailView: View {
                 }
             }
             .listRowBackground(FenixTheme.darkCard)
+
+            if displayedMember.accessStatus == .removed {
+                Section("Delete Login Account") {
+                    Text("This permanently removes this member's sign-in account. If they return later, they will need to register again and be approved again.")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(FenixTheme.darkSecondaryText)
+                        .accessibilityLabel("This permanently removes this member's sign-in account. If they return later, they will need to register again and be approved again.")
+
+                    Button(role: .destructive) {
+                        showingDeleteLoginConfirmation = true
+                    } label: {
+                        Label("Delete login account", systemImage: "trash")
+                    }
+                    .disabled(appModel.loadState == .loading)
+                }
+                .listRowBackground(FenixTheme.darkCard)
+            }
 
             Section("Assign Program") {
                 TextField("Title", text: $programTitle)
@@ -273,11 +312,43 @@ struct AdminMemberDetailView: View {
         .onChange(of: selectedStatus) { _, newStatus in
             if newStatus == .active {
                 inductionComplete = true
+            } else if newStatus == .removed {
+                inductionComplete = false
             }
         }
         .task { await appModel.refreshMemberDetail(displayedMember) }
+        .confirmationDialog(
+            "Remove wellbeing facility access?",
+            isPresented: $showingRemoveAccessConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove access", role: .destructive) {
+                Task { await saveAccess(status: .removed, inductionComplete: false) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This cancels future sessions and archives personal program links/PDF assignments for \(displayedMember.fullName).")
+        }
+        .confirmationDialog(
+            "Delete login account?",
+            isPresented: $showingDeleteLoginConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete login account", role: .destructive) {
+                Task {
+                    if await appModel.deleteRemovedMemberLogin(displayedMember) {
+                        dismiss()
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This cannot be undone. Future sessions and personal programs should already be retired because the member is marked Removed.")
+        }
         .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf], allowsMultipleSelection: false) { result in
             if case let .success(urls) = result, let url = urls.first {
+                // Files selected from outside the app sandbox must be opened through a
+                // temporary security-scoped permission before reading their data.
                 let didAccess = url.startAccessingSecurityScopedResource()
                 defer {
                     if didAccess { url.stopAccessingSecurityScopedResource() }
@@ -286,6 +357,16 @@ struct AdminMemberDetailView: View {
                 pdfFileName = url.lastPathComponent
             }
         }
+    }
+
+    private var accessButtonTitle: String {
+        if !accessIsDirty {
+            return "Access is up to date"
+        }
+        if selectedStatus == .removed {
+            return "Remove access"
+        }
+        return "Save access changes"
     }
 
     private func saveAccess(status: UserProfile.AccessStatus, inductionComplete: Bool) async {

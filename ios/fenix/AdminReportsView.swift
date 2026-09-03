@@ -14,6 +14,10 @@ struct AdminReportsView: View {
     @State private var endDate = Date()
     @State private var exportDocument: CSVDocument?
 
+    private var rangeIsValid: Bool {
+        FacilityTime.calendar.startOfDay(for: startDate) <= FacilityTime.calendar.startOfDay(for: endDate)
+    }
+
     var body: some View {
         List {
             Section("Range") {
@@ -26,8 +30,18 @@ struct AdminReportsView: View {
                 } label: {
                     Label("Refresh report", systemImage: "arrow.clockwise")
                 }
+                .disabled(!rangeIsValid)
             }
             .listRowBackground(FenixTheme.darkCard)
+
+            if !rangeIsValid {
+                Section {
+                    Label("Choose an end date on or after the start date.", systemImage: "calendar.badge.exclamationmark")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(FenixTheme.amber)
+                }
+                .listRowBackground(FenixTheme.darkCard)
+            }
 
             Section("Dashboard") {
                 HStack(spacing: 10) {
@@ -90,8 +104,16 @@ struct AdminReportsView: View {
             }
         }
         .adminListStyle(title: "Reports")
-        .task { await appModel.refreshReports(startDate: startDate, endDate: endDate) }
-        .refreshable { await appModel.refreshReports(startDate: startDate, endDate: endDate) }
+        .task {
+            if rangeIsValid {
+                await appModel.refreshReports(startDate: startDate, endDate: endDate)
+            }
+        }
+        .refreshable {
+            if rangeIsValid {
+                await appModel.refreshReports(startDate: startDate, endDate: endDate)
+            }
+        }
         .fileExporter(
             isPresented: Binding(
                 get: { exportDocument != nil },

@@ -37,7 +37,7 @@ struct CheckInView: View {
                     }
                     .padding(.vertical, 4)
                 } else {
-                    Text("Scan the wellness centre QR code when you arrive for your booked session.")
+                    Text("Scan the wellbeing facility QR code when you arrive for your booked session.")
                         .foregroundStyle(FenixTheme.darkSecondaryText)
                 }
             }
@@ -135,6 +135,8 @@ final class QRScannerController: UIViewController, AVCaptureMetadataOutputObject
     }
 
     private func configureSession() {
+        // Camera permission is handled by AVFoundation. If iOS denies or withholds the
+        // camera, the manual code field in CheckInView remains the fallback path.
         guard
             let device = AVCaptureDevice.default(for: .video),
             let input = try? AVCaptureDeviceInput(device: device),
@@ -177,6 +179,8 @@ final class QRScannerController: UIViewController, AVCaptureMetadataOutputObject
 
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         guard let code = metadataObjects.compactMap({ ($0 as? AVMetadataMachineReadableCodeObject)?.stringValue }).first else { return }
+        // Stop scanning after the first readable code to avoid submitting the same
+        // check-in several times while the sheet is dismissing.
         session.stopRunning()
         onCode?(code)
     }

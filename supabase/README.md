@@ -1,27 +1,64 @@
-# Supabase handover
+# Supabase Handover
 
-This directory is the source-controlled database migration history for the Fenix Wellness Centre application. It must be applied to the receiving organisation's own Supabase project; neither mobile app should be pointed at the development project used during delivery.
+This folder contains the backend setup for the Fenix Wellbeing Facility app. It is intended for a company-owned Supabase project or a future Supabase-compatible Postgres deployment.
 
-## Important migration-history limitation
+No live user data, bookings, storage files, database passwords, service-role keys, or production secrets are included. The mobile app folders do include the current development Supabase project URL and publishable key so the client can run the apps immediately.
 
-The supplied history begins with feature-layer migrations that alter the original booking schema (`profiles`, `bookings`, `facility_rules`, `opening_hours`, `blackout_periods`, and supporting RPCs). The original baseline migration was not present in the source workspace. Therefore these migrations cannot, by themselves, initialise an empty Supabase project.
+## What Is Included
 
-Before go-live, obtain and commit a baseline schema migration from the previous project owner (preferably a `supabase db pull` export that includes the public, storage, and relevant auth-trigger definitions). Test the complete migration chain against a new empty project before distributing either app. Do not improvise or apply the feature migrations manually in the Dashboard.
+- `fenix_full_setup.sql`: one-shot setup SQL for a fresh Supabase project.
+- `migrations/`: migration history from the delivered build.
+- `functions/delete-removed-member`: Edge Function used by admins to permanently delete a member login after that member has first been marked as removed.
 
-## Receiving-company setup
+## Current Development Supabase Project
 
-1. Create a new Supabase project in an organisation owned by the receiving company.
-2. Install a current Supabase CLI, authenticate with `supabase login`, then initialise/link this directory: `supabase init` (only if `config.toml` is absent) and `supabase link --project-ref <project-ref>`.
-3. Add the recovered baseline migration before the existing migrations, preserving chronological filenames.
-4. Run `supabase db push` against the new project.
-5. Review every migration in the Dashboard SQL editor or with `supabase migration list`; then verify tables, RPCs, RLS policies, and the private `wellness-resources` bucket.
-6. Configure Auth URL settings and the mobile deep links described in the root README.
-7. Create the first administrator using a controlled SQL/bootstrap process. Do not grant admin role from a mobile client.
-8. Copy the new project's URL and publishable key to each platform's untracked local configuration file.
+The iOS and Android apps are configured to use the current development Supabase project by default. If the receiving company keeps that project, they should verify Auth redirect URLs, Storage access, Edge Function secrets, admin accounts, and RLS behaviour before release.
 
-## Security rules
+## Fresh Supabase Setup
 
-- Keep the Supabase service-role/secret key out of mobile applications, git history, screenshots, and CI logs.
-- A publishable/anon key belongs in the apps and is protected by RLS; it is not a server secret.
-- RLS and database RPCs, not UI checks, enforce booking capacity, cancellation, access approval, and administration.
-- Review generated SQL and RLS policies before production use. The migrations use privileged functions and storage policies, so a migration test on a blank project is mandatory.
+1. Create a new Supabase project owned by the receiving company.
+2. Enable email/password authentication.
+3. Add the mobile password-reset redirect URLs in **Authentication -> URL Configuration**:
+   `fenixwellness://password-reset` for iOS and `com.fenixresources.wellness://login-callback` for Android.
+4. Run `fenix_full_setup.sql` in the Supabase SQL editor, or with `psql` against the new project.
+5. Deploy the Edge Function:
+   `supabase functions deploy delete-removed-member`
+6. Set the function secrets required by `delete-removed-member`:
+   `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
+7. Create the first user account through the app sign-up screen.
+8. Promote that first trusted user to admin from the SQL editor:
+
+```sql
+update public.profiles
+set
+    role = 'admin',
+    access_status = 'active',
+    induction_completed_at = now()
+where lower(email) = lower('<admin-email>');
+```
+
+After the first admin exists, further admins can be managed inside the app.
+
+## Mobile App Credentials
+
+The mobile apps need the intended Supabase project URL and publishable key. They already contain the current development project values.
+
+- iOS: change `ios/fenix/SupabaseConfig.plist` if moving away from the current development project. Keep `ios/fenix/SupabaseConfig.plist.example` in sync.
+- Android: `android/app/build.gradle.kts` defaults to the current development project. To override it, copy `android/local.properties.example` to `android/local.properties`, then set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`.
+
+These are client-safe publishable values. Never add the service-role key to either mobile app.
+
+## Storage
+
+The setup SQL creates the private `wellness-resources` bucket and policies for shared PDFs and personal workout programs. Users can only see published shared resources and their own assigned personal programs. Admins can manage all uploaded resources and programs.
+
+## Important Security Notes
+
+- Never place the service-role key in the iOS or Android app.
+- The mobile apps should only use the Supabase project URL and publishable/anon key.
+- Booking limits, induction approval, member access, QR check-in, admin actions, storage access, and acknowledgement rules are enforced by database policies and RPCs, not only by the mobile interface.
+- Test with separate admin and member accounts before release.
+
+## If The Client Moves Off Hosted Supabase
+
+This backend uses Supabase-specific pieces: Auth helper functions such as `auth.uid()`, the `auth.users` trigger, Storage tables/policies, and Edge Functions. A future AWS-hosted version should either run self-hosted Supabase on AWS or replace those pieces with equivalent AWS services and update the mobile repository layer to match.

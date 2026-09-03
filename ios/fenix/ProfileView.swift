@@ -50,7 +50,7 @@ struct ProfileView: View {
                 }
                 .listRowBackground(FenixTheme.darkCard)
 
-                Section("Wellness Centre") {
+                Section("Wellbeing Facility") {
                     LabeledContent("Hours", value: appModel.selectedDateOpeningHours?.summary ?? "Available in Book")
                     LabeledContent("Bookings", value: (appModel.rules?.allowedDurationsMinutes ?? FacilityRules.fenixDefault.allowedDurationsMinutes).sorted().map { "\($0)m" }.joined(separator: ", "))
                     LabeledContent("Reminders", value: "60 minutes before")
@@ -70,6 +70,7 @@ struct ProfileView: View {
                     if let acceptedAt = appModel.wellnessAcknowledgementAcceptedAt {
                         LabeledContent("Acknowledged", value: FacilityTime.dateText(acceptedAt))
                     }
+                    LabeledContent("Version", value: appModel.activeAcknowledgement.version)
                     NavigationLink {
                         WellnessAcknowledgementDetailView()
                     } label: {

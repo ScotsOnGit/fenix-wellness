@@ -31,9 +31,9 @@ struct ResourcesView: View {
             }
             .listRowBackground(FenixTheme.darkCard)
 
-            Section("Wellness Resources") {
+            Section("Wellbeing Resources") {
                 if appModel.resources.isEmpty {
-                    Text("Workout guides, stretching routines, and wellness resources will appear here.")
+                    Text("Workout guides, stretching routines, and wellbeing resources will appear here.")
                         .foregroundStyle(FenixTheme.darkSecondaryText)
                 } else {
                     ForEach(appModel.resources.filter(\.isPublished)) { resource in
@@ -112,7 +112,7 @@ struct ResourceLinkRow: View {
     }
 
     private func openResource() async {
-        if type == .link, let linkURL = URL(string: url) {
+        if type == .link, let linkURL = FenixURLValidator.webURL(from: url) {
             await MainActor.run { openURL(linkURL) }
             return
         }

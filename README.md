@@ -1,19 +1,19 @@
-# Fenix Wellness Centre
+# Fenix Wellbeing Facility
 
-The Fenix Wellness Centre mobile system: a native iOS app, the future native Android app, and a shared Supabase/Postgres backend. Staff can register, complete an induction acknowledgement, book gym sessions, check in with a QR code, access resources and wellbeing challenges, and manage their profile. Administrators manage members, bookings, hours, closures, resources, challenges, reports, and audit information.
+The Fenix Wellbeing Facility mobile system: a native iOS app, the future native Android app, and a shared Supabase/Postgres backend. Staff can register, complete an induction acknowledgement, book sessions, check in with a QR code, access resources and wellbeing challenges, and manage their profile. Administrators manage members, bookings, hours, closures, resources, challenges, reports, and audit information.
 
 ## Handover at a glance
 
-This repository is private and intentionally contains **no live Supabase credentials, service-role keys, user data, or production database dump**. The receiving organisation must create and own its own Supabase and mobile-store accounts before release.
+This repository is private and intentionally contains **no service-role keys, user passwords, private database passwords, storage files, or production database dump**. It does include the current development Supabase project URL and publishable mobile key so the client can run the apps immediately after handover. The receiving organisation can keep that project, create a new Supabase project, or migrate the backend later.
 
 | Area | Location | Status |
 | --- | --- | --- |
 | iOS | [`ios/`](ios) | Native SwiftUI implementation included |
 | Android | [`android/`](android) | Native Kotlin/Compose auth and booking foundation included |
-| Database | [`supabase/`](supabase) | Feature migrations included; baseline schema recovery required |
+| Database | [`supabase/`](supabase) | Full fresh-project SQL and migration history included |
 | Original product brief | [`docs/source-brief/`](docs/source-brief) | Reference material |
 
-> **Release gate:** do not point either app at a new Supabase project until a complete baseline migration is restored and the entire migration sequence has passed against an empty test project. Details are in [`supabase/README.md`](supabase/README.md).
+> **Release gate:** test the supplied full setup SQL against a disposable Supabase project before pointing production mobile apps at it. Details are in [`supabase/README.md`](supabase/README.md).
 
 ## Repository layout
 
@@ -21,7 +21,7 @@ This repository is private and intentionally contains **no live Supabase credent
 .
 ├── ios/                 SwiftUI/Xcode application and tests
 ├── android/             Android port location and implementation notes
-├── supabase/migrations/ Versioned database feature migrations
+├── supabase/            Full setup SQL, migrations, and Edge Function
 └── docs/                Handover reference material
 ```
 
@@ -29,7 +29,7 @@ This repository is private and intentionally contains **no live Supabase credent
 
 The database, not the mobile interface, is the source of truth for these rules:
 
-- A maximum of 20 concurrent gym users.
+- A maximum of 20 concurrent facility users.
 - Bookings begin on 15-minute boundaries and use permitted durations.
 - A booking window limited to seven days, one active booking per day, and five future bookings.
 - No overlapping bookings; cancellations only strictly more than one hour before the session.
@@ -43,12 +43,14 @@ The database, not the mobile interface, is the source of truth for these rules:
 
 1. Transfer this repository to the company GitHub organisation or add its administrators as owners.
 2. Create Apple Developer and Google Play Console accounts owned by the company, not an individual contractor.
-3. Create a new Supabase project in a company-owned Supabase organisation.
-4. Store Supabase database passwords, SMTP credentials, signing keys, and store credentials in the company password manager. Never commit them.
+3. Decide whether to keep the current development Supabase project, create a new company-owned Supabase project, or migrate the backend later.
+4. Store Supabase database passwords, SMTP credentials, signing keys, and store credentials in the company password manager. Never commit private keys or passwords.
 
 ### 2. Provision Supabase
 
-Follow [`supabase/README.md`](supabase/README.md) exactly. In brief: restore the missing baseline migration, link the CLI to the new project, apply the full migration history with `supabase db push`, then test the booking and RLS flows using non-admin and admin accounts.
+The apps are already configured to use the current development Supabase project. If the receiving company keeps that project, confirm Auth, Storage, Edge Function secrets, and admin access in Supabase before release.
+
+If the company creates a fresh Supabase project, follow [`supabase/README.md`](supabase/README.md) exactly. In brief: run `supabase/fenix_full_setup.sql`, deploy the `delete-removed-member` Edge Function, then test booking, induction, admin, resources, challenges, and RLS flows using non-admin and admin accounts.
 
 In the Supabase Dashboard:
 
@@ -66,32 +68,35 @@ Requirements: a current macOS/Xcode installation, an Apple Developer team, and a
 
 1. Open [`ios/fenix.xcodeproj`](ios/fenix.xcodeproj) in Xcode.
 2. Set the app’s bundle identifier, signing team, version, and build number for the company.
-3. Copy `ios/fenix/SupabaseConfig.plist.example` to `ios/fenix/SupabaseConfig.plist`.
-4. Set `ProjectURL` and `PublishableKey` from **Supabase Dashboard → Connect**. Add the copied plist to the app target if Xcode does not do so automatically.
-5. Update `CFBundleURLTypes` in `ios/fenix/Info.plist` and the `passwordResetRedirectURL` value in `ios/fenix/AppModels.swift` together if changing the deep-link scheme. Add the exact resulting URI to Supabase Auth Redirect URLs.
-6. Build on a physical device and test sign-up, sign-in, password reset, Face ID/PIN unlock, notification permission/reminder, and camera QR check-in.
+3. The app includes `ios/fenix/SupabaseConfig.plist` with the current development Supabase project URL and publishable key.
+4. If the company changes Supabase projects, replace `ProjectURL` and `PublishableKey` in `ios/fenix/SupabaseConfig.plist` with values from **Supabase Dashboard -> Connect**. The app reads these values in `ios/fenix/SupabaseConfig.swift`.
+5. Keep `ios/fenix/SupabaseConfig.plist.example` in sync with any new project values so future developers can see the expected shape.
+6. Update `CFBundleURLTypes` in `ios/fenix/Info.plist` and the `passwordResetRedirectURL` value in `ios/fenix/AppModels.swift` together if changing the deep-link scheme. Add the exact resulting URI to Supabase Auth Redirect URLs.
+7. Build on a physical device and test sign-up, sign-in, password reset, Face ID/PIN unlock, notification permission/reminder, and camera QR check-in.
 
-`SupabaseConfig.plist` is ignored by git. It is acceptable for this file to contain the project URL and **publishable** key; it must never contain a service-role or secret key.
+`SupabaseConfig.plist` contains only client-safe Supabase values: the project URL and **publishable** key. It must never contain a service-role or secret key.
 
 ### 4. Implement and configure Android
 
-See [`android/README.md`](android/README.md). The Android app is a separate native Kotlin/Compose client and consumes the same backend contract. Auth, password-reset deep linking, session persistence, booking availability, and booking confirmation are implemented. Remaining work is resources, challenges, QR check-in, local biometric/PIN unlock, notifications, and the administration experience.
+See [`android/README.md`](android/README.md). The Android app is a separate native Kotlin/Compose client and consumes the same backend contract. Auth, password-reset deep linking, session persistence, booking availability, booking confirmation, personal-email registration wording, password confirmation, and password visibility toggles are implemented. Remaining work before Android release parity is resources, private programs, challenges, QR check-in/out, local biometric/PIN unlock, notifications, and the administration experience.
 
-Use an Android-specific deep-link callback and add an intent filter that precisely matches it. Test cold-start and warm-start password-reset callbacks on a physical device.
+For Android credentials, `android/app/build.gradle.kts` defaults to the current development Supabase project URL and publishable key. If the company changes Supabase projects, copy `android/local.properties.example` to `android/local.properties`, then set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. These values are exposed to `android/app/src/main/java/com/fenixresources/wellness/data/SupabaseApi.kt` through `BuildConfig`.
+
+Use an Android-specific deep-link callback and add an intent filter that precisely matches it. If the callback changes, update both `android/app/src/main/AndroidManifest.xml` and `android/app/src/main/java/com/fenixresources/wellness/data/SupabaseApi.kt`, then add the same callback URI to Supabase Auth Redirect URLs. Test cold-start and warm-start password-reset callbacks on a physical device.
 
 ## Day-to-day development
 
 - Create database changes as new Supabase migrations; do not make production-only Dashboard edits.
 - Test migrations locally and against a disposable Supabase project before production.
-- Keep platform configuration out of git; document new required keys in example files.
+- Keep private platform configuration out of git; document new required keys in example files.
 - Treat the backend RPC and RLS contract as shared API surface. Coordinate iOS and Android releases for schema-contract changes.
 - Use feature branches and pull requests; require review for database migrations, authentication, and access-control changes.
 
 ## Pre-release checklist
 
-- [ ] Complete baseline schema is committed and a fresh project can be provisioned from git alone.
+- [ ] A fresh Supabase project can be provisioned from `supabase/fenix_full_setup.sql`.
 - [ ] RLS policies and admin/member permissions tested with real test accounts.
-- [ ] iOS and Android use the receiving company’s project URL and publishable key.
+- [ ] iOS and Android point at the intended Supabase project URL and publishable key.
 - [ ] Both mobile deep-link callback URIs are allow-listed in Supabase Auth.
 - [ ] First administrator is seeded securely; ordinary users cannot self-promote.
 - [ ] Storage bucket is private and PDF access is verified for authorised users only.

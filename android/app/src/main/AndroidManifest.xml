@@ -4,7 +4,7 @@
     <application
         android:name=".FenixApplication"
         android:allowBackup="false"
-        android:label="Fenix Wellness Centre"
+        android:label="Fenix Wellbeing Facility"
         android:supportsRtl="true"
         android:theme="@style/Theme.Fenix">
         <activity

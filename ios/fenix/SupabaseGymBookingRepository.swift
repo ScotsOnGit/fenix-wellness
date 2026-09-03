@@ -16,6 +16,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
         var userID: UUID
     }
 
+    // These row structs mirror Supabase column names. Keep conversion to app models
+    // below so the rest of the app can use Swift-friendly names and defaults.
     private struct AuthResponse: Decodable {
         struct User: Decodable {
             let id: UUID
@@ -107,6 +109,46 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
             case phone
             case email
             case notes
+        }
+    }
+
+    private struct AcknowledgementRow: Decodable {
+        let id: UUID
+        let version: String
+        let title: String
+        let body: String
+        let capacityText: String?
+        let fairUseText: String?
+        let medicalText: String?
+        let isActive: Bool
+        let publishedAt: Date?
+        let createdAt: Date
+        let updatedAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case version
+            case title
+            case body
+            case capacityText = "capacity_text"
+            case fairUseText = "fair_use_text"
+            case medicalText = "medical_text"
+            case isActive = "is_active"
+            case publishedAt = "published_at"
+            case createdAt = "created_at"
+            case updatedAt = "updated_at"
+        }
+    }
+
+    private struct AcknowledgementAcceptanceRow: Decodable {
+        let acknowledgementID: UUID
+        let version: String
+        let acceptedAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case acknowledgementID = "acknowledgement_id"
+            case version
+            case acceptedAt = "accepted_at"
         }
     }
 
@@ -415,6 +457,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
         }
         self.decoder = decoder
 
+        // Sessions live in Keychain now, but restoreStoredSession also migrates the
+        // original UserDefaults session used by early test builds.
         restoreStoredSession()
     }
 
@@ -459,6 +503,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
     }
 
     func resetPassword(email: String) async throws {
+        // Supabase's default email template sends users through this redirect target.
+        // The iOS URL type for fenixwellness:// must stay in sync with FenixBrand.
         try await requestWithoutResponse(
             path: "/auth/v1/recover",
             queryItems: [
@@ -478,6 +524,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
             throw BookingError.remote("This link is not a password reset link.")
         }
 
+        // Supabase recovery links place tokens in the URL fragment. Safari may display
+        // a blank fallback page, but iOS should hand the custom URL back to this app.
         guard let accessToken = parameters["access_token"], !accessToken.isEmpty else {
             if parameters["code"] != nil {
                 throw BookingError.remote("This reset link opened with a one-time code instead of a mobile session. Add \(FenixBrand.passwordResetRedirectURL.absoluteString) to the Supabase Auth redirect URLs, then send a new reset email.")
@@ -584,6 +632,83 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
         return try await fetchFacilityContact()
     }
 
+    func fetchActiveAcknowledgement() async throws -> WellnessAcknowledgement {
+        let rows: [AcknowledgementRow] = try await request(
+            path: "/rest/v1/wellness_acknowledgements",
+            queryItems: [
+                URLQueryItem(name: "select", value: "*"),
+                URLQueryItem(name: "is_active", value: "eq.true"),
+                URLQueryItem(name: "limit", value: "1")
+            ],
+            method: "GET",
+            requiresAuth: false
+        )
+        return rows.first.map(acknowledgement(from:)) ?? .fallback
+    }
+
+    func fetchMyAcknowledgementAcceptance() async throws -> WellnessAcknowledgementAcceptance? {
+        guard let userID = authSession?.userID else { return nil }
+        let rows: [AcknowledgementAcceptanceRow] = try await request(
+            path: "/rest/v1/profile_acknowledgements",
+            queryItems: [
+                URLQueryItem(name: "select", value: "acknowledgement_id,version,accepted_at"),
+                URLQueryItem(name: "profile_id", value: "eq.\(userID.uuidString)"),
+                URLQueryItem(name: "order", value: "accepted_at.desc"),
+                URLQueryItem(name: "limit", value: "10")
+            ],
+            method: "GET"
+        )
+        return rows.first.map(acknowledgementAcceptance(from:))
+    }
+
+    func acceptAcknowledgement(_ acknowledgement: WellnessAcknowledgement) async throws -> WellnessAcknowledgementAcceptance {
+        guard let userID = authSession?.userID else { throw BookingError.unauthenticated }
+        let existingRows: [AcknowledgementAcceptanceRow] = try await request(
+            path: "/rest/v1/profile_acknowledgements",
+            queryItems: [
+                URLQueryItem(name: "select", value: "acknowledgement_id,version,accepted_at"),
+                URLQueryItem(name: "profile_id", value: "eq.\(userID.uuidString)"),
+                URLQueryItem(name: "acknowledgement_id", value: "eq.\(acknowledgement.id.uuidString)"),
+                URLQueryItem(name: "limit", value: "1")
+            ],
+            method: "GET"
+        )
+        if let existing = existingRows.first {
+            return acknowledgementAcceptance(from: existing)
+        }
+
+        try await requestWithoutResponse(
+            path: "/rest/v1/profile_acknowledgements",
+            method: "POST",
+            body: [
+                "profile_id": SendableValue.string(userID.uuidString),
+                "acknowledgement_id": SendableValue.string(acknowledgement.id.uuidString),
+                "version": SendableValue.string(acknowledgement.version)
+            ]
+        )
+        let acceptedAt = Date()
+        return WellnessAcknowledgementAcceptance(
+            acknowledgementID: acknowledgement.id,
+            version: acknowledgement.version,
+            acceptedAt: acceptedAt
+        )
+    }
+
+    func publishAcknowledgement(title: String, body: String, capacityText: String, fairUseText: String, medicalText: String) async throws -> WellnessAcknowledgement {
+        let row: AcknowledgementRow = try await request(
+            path: "/rest/v1/rpc/publish_wellness_acknowledgement",
+            method: "POST",
+            body: [
+                "p_title": SendableValue.string(title),
+                "p_body": SendableValue.string(body),
+                "p_capacity_text": nullableString(capacityText),
+                "p_fair_use_text": SendableValue.string(fairUseText),
+                "p_medical_text": SendableValue.string(medicalText)
+            ]
+        )
+        return acknowledgement(from: row)
+    }
+
     func fetchBlackoutPeriods() async throws -> [BlackoutPeriod] {
         let rows: [BlackoutPeriodRow] = try await request(
             path: "/rest/v1/blackout_periods",
@@ -646,14 +771,9 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
             throw BookingError.remote("Enter the staff member's email address.")
         }
 
-        try await requestWithoutResponse(
-            path: "/rest/v1/profiles",
-            queryItems: [URLQueryItem(name: "email", value: "eq.\(cleanEmail)")],
-            method: "PATCH",
-            body: ["role": SendableValue.string(UserProfile.Role.admin.rawValue)]
-        )
-
-        let rows: [ProfileRow] = try await request(
+        // Admin access is granted only to an existing registered profile. Creating Auth
+        // users remains a sign-up flow so there is always a real staff account to audit.
+        let existingRows: [ProfileRow] = try await request(
             path: "/rest/v1/profiles",
             queryItems: [
                 URLQueryItem(name: "select", value: "*"),
@@ -662,10 +782,35 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
             ],
             method: "GET"
         )
-        guard let row = rows.first, row.role == UserProfile.Role.admin.rawValue else {
+        guard let existingRow = existingRows.first else {
             throw BookingError.remote("No registered staff account found for \(cleanEmail). Ask them to create their account first, then try again.")
         }
-        return profile(from: row)
+        if existingRow.role == UserProfile.Role.admin.rawValue {
+            return profile(from: existingRow)
+        }
+
+        try await requestWithoutResponse(
+            path: "/rest/v1/profiles",
+            queryItems: [
+                URLQueryItem(name: "email", value: "eq.\(cleanEmail)")
+            ],
+            method: "PATCH",
+            body: ["role": SendableValue.string(UserProfile.Role.admin.rawValue)]
+        )
+
+        let updatedRows: [ProfileRow] = try await request(
+            path: "/rest/v1/profiles",
+            queryItems: [
+                URLQueryItem(name: "select", value: "*"),
+                URLQueryItem(name: "email", value: "eq.\(cleanEmail)"),
+                URLQueryItem(name: "limit", value: "1")
+            ],
+            method: "GET"
+        )
+        guard let updatedRow = updatedRows.first, updatedRow.role == UserProfile.Role.admin.rawValue else {
+            throw BookingError.remote("Could not add admin access for \(cleanEmail). Check your admin permissions and try again.")
+        }
+        return profile(from: updatedRow)
     }
 
     func demoteAdmin(_ admin: UserProfile) async throws {
@@ -703,6 +848,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
     }
 
     func updateMemberAccess(_ member: UserProfile, accessStatus: UserProfile.AccessStatus, inductionComplete: Bool) async throws -> UserProfile {
+        // This RPC deliberately owns member approval/removal side effects. In particular,
+        // "removed" cancels future bookings and archives private program assignments.
         let row: ProfileRow = try await request(
             path: "/rest/v1/rpc/update_member_access",
             method: "POST",
@@ -713,6 +860,18 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
             ]
         )
         return profile(from: row)
+    }
+
+    func deleteRemovedMemberLogin(_ member: UserProfile) async throws {
+        // Deleting Auth users requires the service role, so it must stay in an Edge
+        // Function or future server route rather than the public mobile client.
+        let _: EmptyResponse = try await request(
+            path: "/functions/v1/delete-removed-member",
+            method: "POST",
+            body: [
+                "user_id": SendableValue.string(member.id.uuidString)
+            ]
+        )
     }
 
     func signOut() async throws {
@@ -767,6 +926,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
     }
 
     func fetchAvailability(for date: Date, durationMinutes: Int) async throws -> [AvailabilitySlot] {
+        // Availability depends on the proposed session length. A 45 minute start checks
+        // the full forward interval from that start, never time before it.
         let rows: [AvailabilityRow] = try await request(
             path: "/rest/v1/rpc/get_availability_for_date",
             method: "POST",
@@ -785,6 +946,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
     }
 
     func createBooking(startTime: Date, durationMinutes: Int) async throws -> GymBooking {
+        // The RPC is the final booking gate and re-checks all rules at write time so a
+        // slot that fills between selection and confirmation is rejected cleanly.
         let row: BookingRow = try await request(
             path: "/rest/v1/rpc/create_booking",
             method: "POST",
@@ -797,6 +960,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
     }
 
     func fetchBookings() async throws -> [GymBooking] {
+        // Keep the member-facing history bounded. Admin reports/export handle larger
+        // date ranges so normal tab loads do not grow forever.
         let futureRows: [BookingRow] = try await request(
             path: "/rest/v1/bookings",
             queryItems: [
@@ -878,6 +1043,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
     }
 
     func checkIn(code: String) async throws -> GymBooking {
+        // The QR code identifies the facility, not the member. The server matches the
+        // signed-in user to an active booking inside the configured check-in window.
         let row: BookingRow = try await request(
             path: "/rest/v1/rpc/check_in_booking",
             method: "POST",
@@ -909,6 +1076,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
             .replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: " ", with: "-")
         let path = "uploads/\(UUID().uuidString)-\(cleanName)"
+        // Store the stable object path in Postgres. The app opens PDFs through short
+        // signed URLs so private program files are not exposed permanently.
         var request = try makeRequest(
             path: "/storage/v1/object/wellness-resources/\(path)",
             queryItems: [],
@@ -1272,6 +1441,30 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
         )
     }
 
+    private func acknowledgement(from row: AcknowledgementRow) -> WellnessAcknowledgement {
+        WellnessAcknowledgement(
+            id: row.id,
+            version: row.version,
+            title: row.title,
+            body: row.body,
+            capacityText: row.capacityText ?? "",
+            fairUseText: row.fairUseText ?? "",
+            medicalText: row.medicalText ?? "",
+            isActive: row.isActive,
+            publishedAt: row.publishedAt,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt
+        )
+    }
+
+    private func acknowledgementAcceptance(from row: AcknowledgementAcceptanceRow) -> WellnessAcknowledgementAcceptance {
+        WellnessAcknowledgementAcceptance(
+            acknowledgementID: row.acknowledgementID,
+            version: row.version,
+            acceptedAt: row.acceptedAt
+        )
+    }
+
     private func blackout(from row: BlackoutPeriodRow) -> BlackoutPeriod {
         BlackoutPeriod(
             id: row.id,
@@ -1442,6 +1635,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
                 output[item.name] = item.value
             }
         }
+        // Supabase places recovery tokens after '#'. URLComponents only treats those as
+        // query items if we parse the fragment as its own pseudo URL.
         if let fragment = url.fragment,
            let fragmentComponents = URLComponents(string: "fenix://fragment?\(fragment)") {
             fragmentComponents.queryItems?.forEach { item in
@@ -1494,6 +1689,7 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
         ]
         let attributes: [String: Any] = [
             kSecValueData as String: data,
+            // Refresh tokens should not migrate to another device through backups.
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
@@ -1584,6 +1780,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
             guard let accessToken = authSession?.accessToken else { throw BookingError.unauthenticated }
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         } else {
+            // Public calls still need the anon key as both apikey and bearer token for
+            // Supabase Auth/PostgREST endpoints.
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
         return request
@@ -1650,6 +1848,8 @@ final class SupabaseGymBookingRepository: GymBookingRepository {
             clearStoredSession()
             throw BookingError.unauthenticated
         }
+        // A failed refresh clears the stored session so the next screen can send the
+        // user back through normal sign-in instead of looping on expired JWT errors.
         var request = try makeRequest(
             path: "/auth/v1/token",
             queryItems: [URLQueryItem(name: "grant_type", value: "refresh_token")],

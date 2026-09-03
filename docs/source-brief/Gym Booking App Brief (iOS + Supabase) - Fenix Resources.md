@@ -2,7 +2,7 @@
 
 ## Overview
 
-This brief defines a SwiftUI iOS app for the Fenix Resources staff wellness centre, which can hold a maximum of 20 people at any one time. The app allows members to create an account, view availability, and book gym sessions while ensuring that no 15-minute time block ever exceeds the 20-person capacity limit.
+This brief defines a SwiftUI iOS app for the Fenix Resources staff wellbeing facility, which can hold a maximum of 20 people at any one time. The app allows members to create an account, view availability, and book gym sessions while ensuring that no 15-minute time block ever exceeds the 20-person capacity limit.
 
 The recommended architecture is a native SwiftUI app backed by Supabase for authentication, PostgreSQL data storage, and policy-based access control. Supabase supports Swift authentication flows and uses PostgreSQL Row Level Security (RLS), which is designed to secure database access for client applications.
 
@@ -337,7 +337,7 @@ These features are useful but should not block version 1:
 - QR check-in at facility entry
 - Health declarations or attendance notes
 - Recurring personal routines (if fairness rules still allow)
-- Multi-facility support (if Fenix adds additional wellness centres)
+- Multi-facility support (if Fenix adds additional wellbeing facilities)
 
 ## Final Recommendation
 

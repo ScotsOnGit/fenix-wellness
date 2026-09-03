@@ -1,4 +1,5 @@
-# Copy to local.properties and replace with values from the receiving company's
-# Supabase Dashboard > Connect dialog. This file is intentionally ignored by git.
-SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_REPLACE_WITH_YOUR_PROJECT_KEY
+# The app defaults to the current development Supabase project so the client can
+# run it immediately after cloning. Copy this file to local.properties and
+# replace these values if the client creates a new Supabase project.
+SUPABASE_URL=https://oknlivhuuhhmnddaxcrq.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_mQj7tTnRfQ9ffNoMUSlkLA_HeqU7GGi

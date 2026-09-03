@@ -5,7 +5,6 @@ DerivedData/
 xcuserdata/
 
 # Per-environment mobile configuration
-ios/fenix/SupabaseConfig.plist
 android/local.properties
 android/app/src/**/supabase.properties
 android/.gradle/

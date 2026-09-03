@@ -32,8 +32,20 @@ enum FenixTheme {
 }
 
 enum FenixBrand {
-    static let appName = "Fenix Wellness Centre"
+    static let appName = "Fenix Wellbeing Facility"
     static let passwordResetRedirectURL = URL(string: "fenixwellness://password-reset")!
+}
+
+enum FenixURLValidator {
+    static func webURL(from text: String) -> URL? {
+        guard let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.host?.isEmpty == false else {
+            return nil
+        }
+        return url
+    }
 }
 
 struct FenixBrandMark: View {
@@ -92,6 +104,8 @@ struct FenixLoadingView: View {
 }
 
 enum FacilityTime {
+    // The facility operates on Perth time regardless of the device's current region.
+    // Keep booking/date calculations on this calendar to avoid FIFO travel edge cases.
     static let timeZone = TimeZone(identifier: "Australia/Perth")!
 
     static var calendar: Calendar {
@@ -205,12 +219,46 @@ struct FacilityContact: Equatable, Sendable {
     var notes: String
 
     static let fenixDefault = FacilityContact(
-        displayName: "Fenix Wellness Centre",
+        displayName: "Fenix Wellbeing Facility",
         address: "",
         phone: "",
         email: "",
-        notes: "Contact your Fenix admin or HR team for wellness centre support."
+        notes: "Contact your Fenix admin or HR team for wellbeing facility support."
     )
+}
+
+struct WellnessAcknowledgement: Identifiable, Equatable, Sendable {
+    var id: UUID
+    var version: String
+    var title: String
+    var body: String
+    var capacityText: String
+    var fairUseText: String
+    var medicalText: String
+    var isActive: Bool
+    var publishedAt: Date?
+    var createdAt: Date
+    var updatedAt: Date
+
+    static let fallback = WellnessAcknowledgement(
+        id: UUID(uuidString: "FEE00000-0000-4000-8000-000000000100")!,
+        version: "2026-06-06-v1",
+        title: "Wellbeing Facility Acknowledgement",
+        body: "Please read and acknowledge this before using the wellbeing facility. Use of the facility is voluntary and at your own risk.",
+        capacityText: "The wellbeing facility is limited to 20 people at a time.",
+        fairUseText: "To keep access fair, each staff member can book one session per day, up to 7 days in advance.",
+        medicalText: "If you have a medical condition, injury, or any concern about exercise, seek medical advice before using the facility.",
+        isActive: true,
+        publishedAt: nil,
+        createdAt: Date(timeIntervalSince1970: 1_717_676_800),
+        updatedAt: Date(timeIntervalSince1970: 1_717_676_800)
+    )
+}
+
+struct WellnessAcknowledgementAcceptance: Equatable, Sendable {
+    var acknowledgementID: UUID
+    var version: String
+    var acceptedAt: Date
 }
 
 struct UserProfile: Identifiable, Equatable, Sendable {
@@ -262,6 +310,7 @@ struct UserProfile: Identifiable, Equatable, Sendable {
     }
 
     var canBookWellnessSessions: Bool {
+        // Admins can test/manage booking flows; members must be both active and inducted.
         role == .admin || (accessStatus.canBook && inductionCompletedAt != nil)
     }
 }
@@ -337,6 +386,8 @@ struct GymBooking: Identifiable, Equatable, Sendable {
     }
 
     var attendanceStatus: AttendanceStatus {
+        // Cancellation is represented by BookingStatus; this value only describes
+        // attendance for bookings that were allowed to proceed.
         if noShowMarkedAt != nil {
             return .noShow
         }
@@ -383,6 +434,8 @@ struct AvailabilitySlot: Identifiable, Equatable, Sendable {
         if occupiedCount >= capacity {
             return .full
         }
+        // Nearly-full is a visual cue only. Capacity and write safety are enforced by
+        // the database RPCs when a booking is created.
         if occupiedCount >= 15 {
             return .nearlyFull
         }
@@ -424,7 +477,7 @@ enum BookingError: LocalizedError, Equatable {
         case .slotFull:
             "This start time is now full. Refresh availability and choose another time."
         case .outsideOpeningHours:
-            "This session extends outside wellness centre hours."
+            "This session extends outside wellbeing facility hours."
         case .maxDailyBookings:
             "You already have a booking on this day."
         case .maxFutureBookings:
@@ -432,7 +485,7 @@ enum BookingError: LocalizedError, Equatable {
         case .cancellationCutoff:
             "Bookings can only be cancelled when more than 60 minutes remain."
         case .accessPending:
-            "Your wellness centre access is pending admin induction approval."
+            "Your wellbeing facility access is pending admin induction approval."
         case .unauthenticated:
             "Please sign in again to continue."
         case let .remote(message):
@@ -465,7 +518,7 @@ struct WellnessResource: Identifiable, Equatable, Sendable {
     var createdAt: Date
 
     var displayURL: URL? {
-        URL(string: url)
+        FenixURLValidator.webURL(from: url)
     }
 }
 
@@ -482,7 +535,7 @@ struct ProgramAssignment: Identifiable, Equatable, Sendable {
     var archivedAt: Date?
 
     var displayURL: URL? {
-        URL(string: url)
+        FenixURLValidator.webURL(from: url)
     }
 }
 
@@ -527,6 +580,8 @@ struct WellbeingChallenge: Identifiable, Equatable, Sendable {
     var createdAt: Date
 
     var status: ChallengeStatus {
+        // Draft challenges remain admin-only even if their dates would otherwise make
+        // them upcoming or active.
         if !isPublished {
             return .draft
         }

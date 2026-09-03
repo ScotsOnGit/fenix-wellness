@@ -49,6 +49,9 @@ struct AuthView: View {
         }
         .tint(FenixTheme.orange)
         .preferredColorScheme(.dark)
+        .task {
+            await appModel.refreshActiveAcknowledgement()
+        }
     }
 
     private var loginContent: some View {
@@ -252,7 +255,7 @@ struct AuthView: View {
                         Image(systemName: acceptedWellnessAcknowledgement ? "checkmark.square.fill" : "square")
                             .font(.body.weight(.semibold))
                             .foregroundStyle(acceptedWellnessAcknowledgement ? FenixTheme.orange : FenixTheme.darkSecondaryText)
-                        Text("I acknowledge that I use the wellness centre voluntarily and at my own risk, and will seek medical advice first if I have a relevant medical condition, injury, or concern.")
+                        Text(appModel.activeAcknowledgement.medicalText)
                             .font(.footnote)
                             .foregroundStyle(FenixTheme.darkSecondaryText)
                             .fixedSize(horizontal: false, vertical: true)

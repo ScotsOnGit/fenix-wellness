@@ -81,6 +81,8 @@ final class LocalSecurityManager {
     }
 
     func setPIN(_ pin: String, for userID: UUID) throws -> LocalSecuritySettings {
+        // The PIN itself is never stored. A per-user salt means the same PIN produces
+        // different hashes for different signed-in accounts on the same device.
         let salt = UUID().uuidString.replacingOccurrences(of: "-", with: "")
         var settings = settings(for: userID)
         settings.pinEnabled = true
@@ -170,6 +172,7 @@ final class LocalSecurityManager {
         ]
         let attributes: [String: Any] = [
             kSecValueData as String: data,
+            // Local app-lock settings should remain on this device only.
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
 

@@ -31,10 +31,12 @@ struct MyBookingsView: View {
                     }
                         .listRowBackground(FenixTheme.darkCard)
                         .swipeActions {
-                            Button(role: .destructive) {
-                                bookingToCancel = nextBooking
-                            } label: {
-                                Label("Cancel", systemImage: "xmark.circle")
+                            if canCancel(nextBooking) {
+                                Button(role: .destructive) {
+                                    bookingToCancel = nextBooking
+                                } label: {
+                                    Label("Cancel", systemImage: "xmark.circle")
+                                }
                             }
                         }
                 } else {
@@ -61,10 +63,12 @@ struct MyBookingsView: View {
                         }
                             .listRowBackground(FenixTheme.darkCard)
                             .swipeActions {
-                                Button(role: .destructive) {
-                                    bookingToCancel = booking
-                                } label: {
-                                    Label("Cancel", systemImage: "xmark.circle")
+                                if canCancel(booking) {
+                                    Button(role: .destructive) {
+                                        bookingToCancel = booking
+                                    } label: {
+                                        Label("Cancel", systemImage: "xmark.circle")
+                                    }
                                 }
                             }
                 }
@@ -162,7 +166,7 @@ struct BookingRow: View {
                     }
                     .buttonStyle(.borderless)
                     .padding(.top, 2)
-                    .accessibilityHint("Cancels this wellness centre booking after confirmation.")
+                    .accessibilityHint("Cancels this wellbeing facility booking after confirmation.")
                 } else {
                     Label("Cancellation cutoff has passed.", systemImage: "lock")
                         .font(.footnote.weight(.semibold))

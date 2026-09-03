@@ -190,9 +190,19 @@ struct AdminOperationsView: View {
                     AdminWellnessContactView()
                 } label: {
                     AdminOperationsLinkRow(
-                        title: "Wellness Centre Information",
+                        title: "Wellbeing Facility Information",
                         subtitle: "Contact details shown to staff in their profile.",
                         systemImage: "info.circle"
+                    )
+                }
+
+                NavigationLink {
+                    AdminAcknowledgementView()
+                } label: {
+                    AdminOperationsLinkRow(
+                        title: "Acknowledgement",
+                        subtitle: "Edit the wording staff must accept before using the facility.",
+                        systemImage: "checkmark.seal"
                     )
                 }
 
@@ -210,7 +220,7 @@ struct AdminOperationsView: View {
                     AdminResourcesView()
                 } label: {
                     AdminOperationsLinkRow(
-                        title: "Wellness Resources",
+                        title: "Wellbeing Resources",
                         subtitle: "Publish shared links and PDFs for staff.",
                         systemImage: "doc.text"
                     )
@@ -417,7 +427,7 @@ private struct AdminWellnessContactView: View {
                 .listRowBackground(FenixTheme.darkCard)
             }
         }
-        .adminListStyle(title: "Centre Info")
+        .adminListStyle(title: "Facility Info")
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
@@ -429,6 +439,117 @@ private struct AdminWellnessContactView: View {
         .onAppear {
             contact = appModel.facilityContact
         }
+    }
+}
+
+private struct AdminAcknowledgementView: View {
+    @Environment(AppModel.self) private var appModel
+    @State private var title = ""
+    @State private var acknowledgementBody = ""
+    @State private var capacityText = ""
+    @State private var fairUseText = ""
+    @State private var medicalText = ""
+
+    private var canSave: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !acknowledgementBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !fairUseText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !medicalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            appModel.loadState != .loading
+    }
+
+    var body: some View {
+        List {
+            Section {
+                LabeledContent("Current version", value: appModel.activeAcknowledgement.version)
+                if let publishedAt = appModel.activeAcknowledgement.publishedAt {
+                    LabeledContent("Published", value: FacilityTime.dateText(publishedAt))
+                }
+            } footer: {
+                Text("Saving publishes a new version. Members will need to accept the updated acknowledgement next time they open the app.")
+            }
+            .listRowBackground(FenixTheme.darkCard)
+
+            Section("Main Wording") {
+                TextField("Title", text: $title)
+                TextField("Intro wording", text: $acknowledgementBody, axis: .vertical)
+                    .lineLimit(3...6)
+            }
+            .listRowBackground(FenixTheme.darkCard)
+
+            Section("Acknowledgement Points") {
+                TextField("Medical advice wording", text: $medicalText, axis: .vertical)
+                    .lineLimit(2...5)
+                TextField("Capacity wording", text: $capacityText, axis: .vertical)
+                    .lineLimit(2...5)
+                TextField("Fair use wording", text: $fairUseText, axis: .vertical)
+                    .lineLimit(2...5)
+            }
+            .listRowBackground(FenixTheme.darkCard)
+
+            Section {
+                WellnessAcknowledgementContent(acknowledgementOverride: draftAcknowledgement)
+                    .padding(.vertical, 8)
+            } header: {
+                Text("Draft Member Preview")
+            }
+            .listRowBackground(FenixTheme.darkCard)
+
+            if let accountMessage = appModel.accountMessage(for: .acknowledgement) {
+                Section {
+                    Text(accountMessage)
+                        .foregroundStyle(FenixTheme.darkSecondaryText)
+                }
+                .listRowBackground(FenixTheme.darkCard)
+            }
+        }
+        .adminListStyle(title: "Acknowledgement")
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Publish") {
+                    Task {
+                        await appModel.publishAcknowledgement(
+                            title: title,
+                            body: acknowledgementBody,
+                            capacityText: capacityText,
+                            fairUseText: fairUseText,
+                            medicalText: medicalText
+                        )
+                    }
+                }
+                .disabled(!canSave)
+            }
+        }
+        .onAppear(perform: loadCurrentAcknowledgement)
+        .onChange(of: appModel.activeAcknowledgement) { _, _ in
+            loadCurrentAcknowledgement()
+        }
+    }
+
+    private func loadCurrentAcknowledgement() {
+        let acknowledgement = appModel.activeAcknowledgement
+        title = acknowledgement.title
+        acknowledgementBody = acknowledgement.body
+        capacityText = acknowledgement.capacityText
+        fairUseText = acknowledgement.fairUseText
+        medicalText = acknowledgement.medicalText
+    }
+
+    private var draftAcknowledgement: WellnessAcknowledgement {
+        WellnessAcknowledgement(
+            id: appModel.activeAcknowledgement.id,
+            version: appModel.activeAcknowledgement.version,
+            title: title.isEmpty ? "Wellbeing Facility Acknowledgement" : title,
+            body: acknowledgementBody,
+            capacityText: capacityText,
+            fairUseText: fairUseText,
+            medicalText: medicalText,
+            isActive: true,
+            publishedAt: appModel.activeAcknowledgement.publishedAt,
+            createdAt: appModel.activeAcknowledgement.createdAt,
+            updatedAt: appModel.activeAcknowledgement.updatedAt
+        )
     }
 }
 
