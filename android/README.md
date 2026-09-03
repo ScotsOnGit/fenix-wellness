@@ -7,7 +7,7 @@ Android is not yet at full feature parity with the iOS app. Treat it as a mainta
 ## Run it
 
 1. Install Android Studio with Android SDK Platform 35 and JDK 17.
-2. Copy `local.properties.example` to `local.properties` and set the receiving company's Supabase URL and publishable key.
+2. The app defaults to the current development Supabase project. To use a different project, copy `local.properties.example` to `local.properties` and set the receiving company's Supabase URL and publishable key.
 3. Open this `android/` directory in Android Studio, then sync and run the `app` configuration.
 4. In Supabase Auth URL Configuration, add `com.fenixresources.wellness://login-callback` as an allowed redirect URL. Change this URI in both `AndroidManifest.xml` and `SupabaseApi.kt` if the company changes the application ID.
 
@@ -15,9 +15,9 @@ The publishable key may be present in a mobile app; the service-role/secret key 
 
 ## Where Credentials Are Set
 
-- `android/local.properties`: receiving-company Supabase values go here. This file is ignored by git.
-- `android/local.properties.example`: placeholder values committed for handover.
-- `android/app/build.gradle.kts`: reads `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` from `local.properties`.
+- `android/app/build.gradle.kts`: contains the current development Supabase project URL and publishable key as defaults.
+- `android/local.properties`: optional receiving-company Supabase override values go here. This file is ignored by git.
+- `android/local.properties.example`: current development values committed for handover and as an override template.
 - `android/app/src/main/java/com/fenixresources/wellness/data/SupabaseApi.kt`: uses those values through `BuildConfig`.
 
 ## Included features

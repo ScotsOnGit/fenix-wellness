@@ -2,13 +2,17 @@
 
 This folder contains the backend setup for the Fenix Wellbeing Facility app. It is intended for a company-owned Supabase project or a future Supabase-compatible Postgres deployment.
 
-No live user data, bookings, storage files, database passwords, service-role keys, or production secrets are included.
+No live user data, bookings, storage files, database passwords, service-role keys, or production secrets are included. The mobile app folders do include the current development Supabase project URL and publishable key so the client can run the apps immediately.
 
 ## What Is Included
 
 - `fenix_full_setup.sql`: one-shot setup SQL for a fresh Supabase project.
 - `migrations/`: migration history from the delivered build.
 - `functions/delete-removed-member`: Edge Function used by admins to permanently delete a member login after that member has first been marked as removed.
+
+## Current Development Supabase Project
+
+The iOS and Android apps are configured to use the current development Supabase project by default. If the receiving company keeps that project, they should verify Auth redirect URLs, Storage access, Edge Function secrets, admin accounts, and RLS behaviour before release.
 
 ## Fresh Supabase Setup
 
@@ -37,10 +41,10 @@ After the first admin exists, further admins can be managed inside the app.
 
 ## Mobile App Credentials
 
-The mobile apps need the receiving company's Supabase project URL and publishable key.
+The mobile apps need the intended Supabase project URL and publishable key. They already contain the current development project values.
 
-- iOS: copy `ios/fenix/SupabaseConfig.plist.example` to `ios/fenix/SupabaseConfig.plist`, then set `ProjectURL` and `PublishableKey`.
-- Android: copy `android/local.properties.example` to `android/local.properties`, then set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`.
+- iOS: change `ios/fenix/SupabaseConfig.plist` if moving away from the current development project. Keep `ios/fenix/SupabaseConfig.plist.example` in sync.
+- Android: `android/app/build.gradle.kts` defaults to the current development project. To override it, copy `android/local.properties.example` to `android/local.properties`, then set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`.
 
 These are client-safe publishable values. Never add the service-role key to either mobile app.
 
