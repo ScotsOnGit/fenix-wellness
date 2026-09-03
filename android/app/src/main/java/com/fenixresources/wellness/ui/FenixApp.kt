@@ -9,9 +9,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import com.fenixresources.wellness.MainViewModel
 import com.fenixresources.wellness.data.AvailabilityRow
 import java.time.LocalDate
@@ -31,19 +35,21 @@ fun FenixApp(viewModel: MainViewModel) {
         }
     }
     state.message?.let { message ->
-        AlertDialog(onDismissRequest = viewModel::dismissMessage, confirmButton = { TextButton(viewModel::dismissMessage) { Text("OK") } }, title = { Text("Fenix Wellness Centre") }, text = { Text(message) })
+        AlertDialog(onDismissRequest = viewModel::dismissMessage, confirmButton = { TextButton(viewModel::dismissMessage) { Text("OK") } }, title = { Text("Fenix Wellbeing Facility") }, text = { Text(message) })
     }
 }
 
 @Composable
 private fun PasswordRecoveryScreen(viewModel: MainViewModel) {
     var password by rememberSaveable { mutableStateOf("") }
+    var confirmPassword by rememberSaveable { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
         Text("Choose a new password", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(12.dp))
-        OutlinedTextField(password, { password = it }, label = { Text("New password") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        PasswordField(password, { password = it }, "New password")
+        PasswordField(confirmPassword, { confirmPassword = it }, "Confirm password")
         Spacer(Modifier.height(16.dp))
-        Button({ viewModel.updatePassword(password) }, enabled = password.length >= 8, modifier = Modifier.fillMaxWidth()) { Text("Update password") }
+        Button({ viewModel.updatePassword(password) }, enabled = password.length >= 8 && password == confirmPassword, modifier = Modifier.fillMaxWidth()) { Text("Update password") }
     }
 }
 
@@ -51,8 +57,9 @@ private fun PasswordRecoveryScreen(viewModel: MainViewModel) {
 private fun AuthScreen(register: Boolean, setRegister: (Boolean) -> Unit, viewModel: MainViewModel) {
     var name by rememberSaveable { mutableStateOf("") }; var phone by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }; var password by rememberSaveable { mutableStateOf("") }
+    var confirmPassword by rememberSaveable { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
-        Text("Fenix Wellness Centre", style = MaterialTheme.typography.headlineMedium)
+        Text("Fenix Wellbeing Facility", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(20.dp))
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             SegmentedButton(!register, { setRegister(false) }, SegmentedButtonDefaults.itemShape(0, 2)) { Text("Sign in") }
@@ -62,16 +69,37 @@ private fun AuthScreen(register: Boolean, setRegister: (Boolean) -> Unit, viewMo
             OutlinedTextField(name, { name = it }, label = { Text("Full name") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(phone, { phone = it }, label = { Text("Phone (optional)") }, modifier = Modifier.fillMaxWidth())
         }
-        OutlinedTextField(email, { email = it }, label = { Text("Work email") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(password, { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(email, { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
+        PasswordField(password, { password = it }, "Password")
+        if (register) PasswordField(confirmPassword, { confirmPassword = it }, "Confirm password")
         Spacer(Modifier.height(16.dp))
         Button(
             onClick = { if (register) viewModel.register(name, email, password, phone) else viewModel.signIn(email, password) },
-            enabled = email.isNotBlank() && password.isNotBlank() && (!register || name.isNotBlank()),
+            enabled = email.isNotBlank() && password.isNotBlank() && (!register || (name.isNotBlank() && password == confirmPassword)),
             modifier = Modifier.fillMaxWidth()
         ) { Text(if (register) "Create account" else "Sign in") }
         TextButton({ viewModel.sendRecovery(email) }, enabled = email.isNotBlank(), modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Forgot password?") }
     }
+}
+
+@Composable
+private fun PasswordField(value: String, onValueChange: (String) -> Unit, label: String) {
+    var visible by rememberSaveable { mutableStateOf(false) }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+        trailingIcon = {
+            IconButton(onClick = { visible = !visible }) {
+                Icon(
+                    imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                    contentDescription = if (visible) "Hide password" else "Show password"
+                )
+            }
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Composable

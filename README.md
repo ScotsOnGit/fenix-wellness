@@ -67,17 +67,20 @@ Requirements: a current macOS/Xcode installation, an Apple Developer team, and a
 1. Open [`ios/fenix.xcodeproj`](ios/fenix.xcodeproj) in Xcode.
 2. Set the app’s bundle identifier, signing team, version, and build number for the company.
 3. Copy `ios/fenix/SupabaseConfig.plist.example` to `ios/fenix/SupabaseConfig.plist`.
-4. Set `ProjectURL` and `PublishableKey` from **Supabase Dashboard → Connect**. Add the copied plist to the app target if Xcode does not do so automatically.
-5. Update `CFBundleURLTypes` in `ios/fenix/Info.plist` and the `passwordResetRedirectURL` value in `ios/fenix/AppModels.swift` together if changing the deep-link scheme. Add the exact resulting URI to Supabase Auth Redirect URLs.
-6. Build on a physical device and test sign-up, sign-in, password reset, Face ID/PIN unlock, notification permission/reminder, and camera QR check-in.
+4. In `ios/fenix/SupabaseConfig.plist`, set `ProjectURL` and `PublishableKey` from **Supabase Dashboard -> Connect**.
+5. Add the copied plist to the app target in Xcode if it is not included automatically. The app reads these values in `ios/fenix/SupabaseConfig.swift`.
+6. Update `CFBundleURLTypes` in `ios/fenix/Info.plist` and the `passwordResetRedirectURL` value in `ios/fenix/AppModels.swift` together if changing the deep-link scheme. Add the exact resulting URI to Supabase Auth Redirect URLs.
+7. Build on a physical device and test sign-up, sign-in, password reset, Face ID/PIN unlock, notification permission/reminder, and camera QR check-in.
 
 `SupabaseConfig.plist` is ignored by git. It is acceptable for this file to contain the project URL and **publishable** key; it must never contain a service-role or secret key.
 
 ### 4. Implement and configure Android
 
-See [`android/README.md`](android/README.md). The Android app is a separate native Kotlin/Compose client and consumes the same backend contract. Auth, password-reset deep linking, session persistence, booking availability, and booking confirmation are implemented. Remaining work is resources, challenges, QR check-in, local biometric/PIN unlock, notifications, and the administration experience.
+See [`android/README.md`](android/README.md). The Android app is a separate native Kotlin/Compose client and consumes the same backend contract. Auth, password-reset deep linking, session persistence, booking availability, booking confirmation, personal-email registration wording, password confirmation, and password visibility toggles are implemented. Remaining work before Android release parity is resources, private programs, challenges, QR check-in/out, local biometric/PIN unlock, notifications, and the administration experience.
 
-Use an Android-specific deep-link callback and add an intent filter that precisely matches it. Test cold-start and warm-start password-reset callbacks on a physical device.
+For Android credentials, copy `android/local.properties.example` to `android/local.properties`, then set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. These values are read by `android/app/build.gradle.kts` and exposed to `android/app/src/main/java/com/fenixresources/wellness/data/SupabaseApi.kt` through `BuildConfig`.
+
+Use an Android-specific deep-link callback and add an intent filter that precisely matches it. If the callback changes, update both `android/app/src/main/AndroidManifest.xml` and `android/app/src/main/java/com/fenixresources/wellness/data/SupabaseApi.kt`, then add the same callback URI to Supabase Auth Redirect URLs. Test cold-start and warm-start password-reset callbacks on a physical device.
 
 ## Day-to-day development
 

@@ -14,8 +14,8 @@ No live user data, bookings, storage files, database passwords, service-role key
 
 1. Create a new Supabase project owned by the receiving company.
 2. Enable email/password authentication.
-3. Add the iOS password-reset redirect URL in **Authentication -> URL Configuration**:
-   `fenixwellness://password-reset`
+3. Add the mobile password-reset redirect URLs in **Authentication -> URL Configuration**:
+   `fenixwellness://password-reset` for iOS and `com.fenixresources.wellness://login-callback` for Android.
 4. Run `fenix_full_setup.sql` in the Supabase SQL editor, or with `psql` against the new project.
 5. Deploy the Edge Function:
    `supabase functions deploy delete-removed-member`
@@ -34,6 +34,15 @@ where lower(email) = lower('<admin-email>');
 ```
 
 After the first admin exists, further admins can be managed inside the app.
+
+## Mobile App Credentials
+
+The mobile apps need the receiving company's Supabase project URL and publishable key.
+
+- iOS: copy `ios/fenix/SupabaseConfig.plist.example` to `ios/fenix/SupabaseConfig.plist`, then set `ProjectURL` and `PublishableKey`.
+- Android: copy `android/local.properties.example` to `android/local.properties`, then set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`.
+
+These are client-safe publishable values. Never add the service-role key to either mobile app.
 
 ## Storage
 
